@@ -1,0 +1,54 @@
+IF OBJECT_ID('tempdb..#DBCCResults') IS NOT NULL
+BEGIN
+    DROP TABLE #DBCCResults;
+END
+
+IF OBJECT_ID('tempdb..#temp') IS NOT NULL
+BEGIN
+    DROP TABLE #temp;
+END
+
+
+
+
+----------------------------CHECKDB---------------------------------------
+BEGIN
+    SET NOCOUNT ON;
+
+    CREATE TABLE #temp (
+        ParentObject     VARCHAR(255),
+        [Object]         VARCHAR(255),
+        Field            VARCHAR(255),
+        [Value]          VARCHAR(255)
+    );
+
+    CREATE TABLE #DBCCResults (
+        ServerName           VARCHAR(255),
+        DBName               VARCHAR(255),
+        LastCleanDBCCDate    DATETIME
+    );
+
+    EXEC master.[sys].[sp_MSforeachdb]
+        @command1 = 'USE [?] INSERT INTO #temp EXECUTE (''DBCC DBINFO WITH TABLERESULTS'')',
+        @command2 = 'INSERT INTO #DBCCResults SELECT @@SERVERNAME, ''?'', Value FROM #temp WHERE Field = ''dbi_dbccLastKnownGood''',
+        @command3 = 'TRUNCATE TABLE #temp';
+
+    -- Remove duplicate rows
+    ;WITH DBCC_CTE AS
+    (
+        SELECT ROW_NUMBER() OVER (PARTITION BY ServerName, DBName, LastCleanDBCCDate ORDER BY LastCleanDBCCDate) RowID
+        FROM #DBCCResults
+    )
+    DELETE FROM DBCC_CTE WHERE RowID > 1;
+
+
+
+END
+
+SELECT * FROM #DBCCResults;
+
+
+
+
+
+

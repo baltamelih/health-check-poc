@@ -1,0 +1,575 @@
+
+USE [master];
+GO
+
+
+IF OBJECT_ID('tempdb..##ScoreMasterConfig') IS NOT NULL
+    DROP TABLE ##ScoreMasterConfig;
+
+CREATE TABLE ##ScoreMasterConfig (
+    [SmcID] INT PRIMARY KEY IDENTITY(1,1) NOT NULL,
+    [Description] NVARCHAR(255),
+    [Failed] INT,
+    [Warning] INT,
+    [Successful] INT
+);
+
+INSERT INTO ##ScoreMasterConfig (Description, Failed, Warning, Successful)
+VALUES 
+    ('Sa Account', 0, 5, 15),
+    ('SQL Server Engine Account', 0, 5, 10),
+    ('Orphan User', 0, 5, 10),
+    ('Complex Passwords', 0, 5, 15),
+    ('Same SQL Username as Password', 0, 5, 10),
+    ('Blank Username Password', 0, 5, 10),
+    ('Disable Logins', 0, 5, 25),
+    ('Logins', 0, 5, 50),
+    ('SQL Server Login Mode', 0, 5, 25),
+    ('Xpcmdshell', 0, 5, 50),
+    ('Version', 0, 5, 50),
+    ('dbowner', 0, 5, 10),
+    ('SQL Server Agent Account', 0, 5, 20),
+    ('CLR', 0, 5, 20);
+
+
+
+USE [master];
+GO
+
+IF OBJECT_ID('tempdb..##SecHc_info') IS NOT NULL
+    DROP TABLE ##SecHc_info;
+
+CREATE TABLE ##SecHc_info (
+    [Id] INT IDENTITY(1,1),
+    [username] NVARCHAR(50),
+    [rundate] DATETIME
+);
+INSERT INTO ##SecHc_info ([username], [rundate])
+SELECT SUSER_NAME(), GETDATE();
+
+
+SELECT * FROM ##SecHc_info;
+
+IF OBJECT_ID('tempdb..##SecHc_info') IS NOT NULL
+    DROP TABLE ##SecHc_info;
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##ScoreMasterDetail') IS NOT NULL
+    DROP TABLE ##ScoreMasterDetail;
+
+CREATE TABLE ##ScoreMasterDetail (
+    [smcID] INT,
+    [Score] INT
+);
+
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_ComplexPassword') IS NOT NULL
+    DROP TABLE ##SecHC_ComplexPassword;
+CREATE TABLE ##SecHC_ComplexPassword (
+    [name] NVARCHAR(256),
+    [is_policy_checked] NVARCHAR(256),
+    [is_expiration_checked] NVARCHAR(256)
+);
+INSERT INTO ##SecHC_ComplexPassword ([name], [is_policy_checked], [is_expiration_checked])
+SELECT [name], is_policy_checked, is_expiration_checked
+FROM sys.sql_logins
+WHERE is_policy_checked = 0;
+
+IF EXISTS (SELECT 1 FROM ##SecHC_ComplexPassword)
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (4, (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 4));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (4, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 4));
+END;
+
+SELECT * FROM ##SecHC_ComplexPassword;
+
+
+IF OBJECT_ID('tempdb..##SecHC_ComplexPassword') IS NOT NULL
+    DROP TABLE ##SecHC_ComplexPassword;
+
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_BlankUsernamePassword') IS NOT NULL
+    DROP TABLE ##SecHC_BlankUsernamePassword;
+
+CREATE TABLE ##SecHC_BlankUsernamePassword (
+    [name] NVARCHAR(256),
+    [type_desc] NVARCHAR(256),
+    [create_date] DATETIME,
+    [modify_date] DATETIME,
+    [password_hash] NVARCHAR(256)
+);
+INSERT INTO ##SecHC_BlankUsernamePassword ([name], [type_desc], [create_date], [modify_date], [password_hash])
+SELECT name, type_desc, create_date, modify_date, password_hash
+FROM sys.sql_logins
+WHERE PWDCOMPARE('', password_hash) = 1;
+USE [master];
+GO
+IF EXISTS (SELECT 1 FROM ##SecHC_BlankUsernamePassword)
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (6, (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 6));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (6, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 6));
+END;
+
+
+SELECT * FROM ##SecHC_BlankUsernamePassword;
+
+IF OBJECT_ID('tempdb..##SecHC_BlankUsernamePassword') IS NOT NULL
+    DROP TABLE ##SecHC_BlankUsernamePassword;
+
+
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_DisableLogins') IS NOT NULL
+    DROP TABLE ##SecHC_DisableLogins;
+
+CREATE TABLE ##SecHC_DisableLogins (
+    [Name] NVARCHAR(256),
+    [LoginType] NVARCHAR(256),
+    [AssociatedServerRole] NVARCHAR(256),
+    [Status] NVARCHAR(256)
+);
+INSERT INTO ##SecHC_DisableLogins ([Name], [LoginType], [AssociatedServerRole], [Status])
+SELECT name, type_desc, ISNULL(SUSER_NAME(role_principal_id), 'public'),
+    CASE WHEN is_disabled = 1 THEN 'Disabled' ELSE 'Enabled' END
+FROM sys.server_principals
+LEFT JOIN sys.server_role_members ON principal_id = member_principal_id
+WHERE is_disabled = 1 AND type_desc <> 'SERVER_ROLE';
+
+IF EXISTS (SELECT 1 FROM ##SecHC_DisableLogins)
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (7, (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 7));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (7, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 7));
+END;
+
+
+SELECT * FROM ##SecHC_DisableLogins;
+
+
+IF OBJECT_ID('tempdb..##SecHC_DisableLogins') IS NOT NULL
+    DROP TABLE ##SecHC_DisableLogins;
+
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_Loginmode') IS NOT NULL
+    DROP TABLE ##SecHC_Loginmode;
+
+CREATE TABLE ##SecHC_Loginmode (
+    [Name] NVARCHAR(256),
+    [Config_value] NVARCHAR(256)
+);
+INSERT INTO ##SecHC_Loginmode ([Name], [Config_value])
+SELECT [name], CAST([value_in_use] AS NVARCHAR(256))
+FROM sys.configurations
+WHERE [name] = 'login mode';
+
+IF EXISTS (SELECT 1 FROM ##SecHC_Loginmode WHERE Config_value = 'Mixed')
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (9, (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 9));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (9, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 9));
+END;
+
+
+SELECT * FROM ##SecHC_Loginmode;
+
+
+IF OBJECT_ID('tempdb..##SecHC_Loginmode') IS NOT NULL
+    DROP TABLE ##SecHC_Loginmode;
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_OrphanUser') IS NOT NULL
+    DROP TABLE ##SecHC_OrphanUser;
+
+CREATE TABLE ##SecHC_OrphanUser (
+    [Dbname] NVARCHAR(256),
+    [Username] NVARCHAR(256),
+    [CreateDate] DATETIME,
+    [UserType] NVARCHAR(256)
+);
+
+EXEC sp_MSforeachdb 'USE [?];
+WITH CTE AS (
+    SELECT 
+        DB_NAME() AS Dbname, 
+        name AS Username, 
+        createdate AS CreateDate, 
+        CASE 
+            WHEN isntgroup = 0 AND isntuser = 0 THEN ''SQL LOGIN''
+            WHEN isntgroup = 1 THEN ''NT GROUP''
+            ELSE ''NT LOGIN'' 
+        END AS UserType
+    FROM sys.sysusers 
+    WHERE islogin = 1
+)
+INSERT INTO ##SecHC_OrphanUser ([Dbname], [Username], [CreateDate], [UserType])
+SELECT CTE.Dbname, CTE.Username, CTE.CreateDate, CTE.UserType
+FROM CTE
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM ##SecHC_OrphanUser
+    WHERE ##SecHC_OrphanUser.Username COLLATE DATABASE_DEFAULT = CTE.Username COLLATE DATABASE_DEFAULT
+);';
+
+
+IF EXISTS (SELECT 1 FROM ##SecHC_OrphanUser)
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (3, (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 3));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (3, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 3));
+END;
+
+
+SELECT * FROM ##SecHC_OrphanUser;
+
+
+IF OBJECT_ID('tempdb..##SecHC_OrphanUser') IS NOT NULL
+    DROP TABLE ##SecHC_OrphanUser;
+
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_SaAccount') IS NOT NULL
+    DROP TABLE ###SecHC_SaAccount;
+
+CREATE TABLE ##SecHC_SaAccount (
+    [Name] NVARCHAR(256),
+    [Status] NVARCHAR(256)
+);
+INSERT INTO ##SecHC_SaAccount ([Name], [Status])
+SELECT name, CASE WHEN is_disabled = 1 THEN 'Disabled' ELSE 'Enabled' END
+FROM sys.sql_logins WHERE principal_id = 1;
+
+IF EXISTS (SELECT 1 FROM ##SecHC_SaAccount WHERE Status = 'Disabled')
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (1, (SELECT Warning FROM ##ScoreMasterConfig WHERE SmcID = 1));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (1, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 1));
+END;
+
+
+SELECT * FROM ##SecHC_SaAccount;
+
+IF OBJECT_ID('tempdb..##SecHC_SaAccount') IS NOT NULL
+    DROP TABLE ##SecHC_SaAccount;
+
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_Xpcmdshell') IS NOT NULL
+    DROP TABLE ##SecHC_Xpcmdshell;
+
+CREATE TABLE ##SecHC_Xpcmdshell (
+    [xp_cmdshell_configuredvalue] NVARCHAR(256)
+);
+INSERT INTO ##SecHC_Xpcmdshell ([xp_cmdshell_configuredvalue])
+SELECT CAST(value_in_use AS NVARCHAR(256))
+FROM sys.configurations
+WHERE [name] = 'xp_cmdshell';
+
+IF EXISTS (SELECT 1 FROM ##SecHC_Xpcmdshell WHERE xp_cmdshell_configuredvalue = '1')
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (10, (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 10));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (10, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 10));
+END;
+
+
+SELECT * FROM ##SecHC_Xpcmdshell;
+
+IF OBJECT_ID('tempdb..##SecHC_Xpcmdshell') IS NOT NULL
+    DROP TABLE ##SecHC_Xpcmdshell;
+
+
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_SameSQLUsernameasPassword') IS NOT NULL
+    DROP TABLE ##SecHC_SameSQLUsernameasPassword;
+
+CREATE TABLE ##SecHC_SameSQLUsernameasPassword (
+    [name] NVARCHAR(256),
+    [type_desc] NVARCHAR(256),
+    [create_date] DATETIME,
+    [modify_date] DATETIME,
+    [password_hash] NVARCHAR(256)
+);
+INSERT INTO ##SecHC_SameSQLUsernameasPassword ([name], [type_desc], [create_date], [modify_date], [password_hash])
+SELECT name, type_desc, create_date, modify_date, password_hash
+FROM sys.sql_logins
+WHERE PWDCOMPARE(name, password_hash) = 1;
+
+IF EXISTS (SELECT 1 FROM ##SecHC_SameSQLUsernameasPassword)
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (5, (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 5));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (5, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 5));
+END;
+
+
+SELECT * FROM ##SecHC_SameSQLUsernameasPassword;
+
+IF OBJECT_ID('tempdb..##SecHC_SameSQLUsernameasPassword') IS NOT NULL
+    DROP TABLE ##SecHC_SameSQLUsernameasPassword;
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_dbowner') IS NOT NULL
+    DROP TABLE ##SecHC_dbowner;
+
+CREATE TABLE ##SecHC_dbowner (
+    [DatabaseName] NVARCHAR(255),
+    [UserName] NVARCHAR(255),
+    [RoleName] NVARCHAR(255)
+);
+DECLARE @dbname NVARCHAR(255);
+DECLARE @sql NVARCHAR(MAX);
+DECLARE db_cursor CURSOR FOR
+SELECT name FROM master.sys.databases WHERE state_desc = 'ONLINE';
+
+OPEN db_cursor;
+FETCH NEXT FROM db_cursor INTO @dbname;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    SET @sql = 'USE [' + @dbname + ']; ' +
+               'INSERT INTO ##SecHC_dbowner ([DatabaseName], [UserName], [RoleName]) ' +
+               'SELECT ''' + @dbname + ''', dp.name AS UserName, pr.name AS RoleName ' +
+               'FROM sys.database_principals dp ' +
+               'JOIN sys.database_role_members drm ON dp.principal_id = drm.member_principal_id ' +
+               'JOIN sys.database_principals pr ON drm.role_principal_id = pr.principal_id ' +
+               'WHERE pr.name IN (''db_owner'', ''dbo'');';
+    EXEC sp_executesql @sql;
+    FETCH NEXT FROM db_cursor INTO @dbname;
+END;
+
+CLOSE db_cursor;
+DEALLOCATE db_cursor;
+
+IF EXISTS (SELECT 1 FROM ##SecHC_dbowner)
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (12, (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 12));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (12, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 12));
+END;
+
+
+SELECT * FROM ##SecHC_dbowner;
+
+
+IF OBJECT_ID('tempdb..##SecHC_dbowner') IS NOT NULL
+    DROP TABLE ##SecHC_dbowner;
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHc_ServiceAccount') IS NOT NULL
+    DROP TABLE ##SecHc_ServiceAccount;
+
+CREATE TABLE ##SecHc_ServiceAccount (
+    [servicename] NVARCHAR(512),
+    [startup_type] INT,
+    [startup_type_desc] NVARCHAR(512),
+    [status] INT,
+    [status_desc] NVARCHAR(512),
+    [process_id] INT,
+    [last_startup_time] NVARCHAR(50),  -- DATETIMEOFFSET yerine NVARCHAR kullanıldı
+    [service_account] NVARCHAR(512),
+    [filename] NVARCHAR(512),
+    [is_clustered] NVARCHAR(2),
+    [cluster_nodename] NVARCHAR(512)
+);
+
+INSERT INTO ##SecHc_ServiceAccount
+SELECT
+    servicename,
+    startup_type,
+    startup_type_desc,
+    status,
+    status_desc,
+    process_id,
+    CONVERT(NVARCHAR(50), last_startup_time, 120),
+    service_account,
+    filename,
+    is_clustered,
+    cluster_nodename
+FROM sys.dm_server_services;
+
+IF EXISTS (SELECT 1 FROM ##SecHc_ServiceAccount)
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (2, (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 2));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (2, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 2));
+END;
+
+
+SELECT * FROM ##SecHc_ServiceAccount;
+
+
+IF OBJECT_ID('tempdb..##SecHc_ServiceAccount') IS NOT NULL
+    DROP TABLE ##SecHc_ServiceAccount;
+
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHc_Sysadminlogin') IS NOT NULL
+    DROP TABLE ##SecHc_Sysadminlogin;
+
+CREATE TABLE ##SecHc_Sysadminlogin (
+    [Name] NVARCHAR(50),
+    [LoginType] NVARCHAR(50),
+    [AssociatedServerRole] NVARCHAR(50),
+    [Status] NVARCHAR(50)
+);
+
+INSERT INTO ##SecHc_Sysadminlogin ([Name], [LoginType], [AssociatedServerRole], [Status])
+SELECT name, type_desc, ISNULL(SUSER_NAME(role_principal_id), 'public'),
+    CASE WHEN is_disabled = 1 THEN 'Disabled' ELSE 'Enabled' END
+FROM sys.server_principals
+LEFT JOIN sys.server_role_members ON principal_id = member_principal_id
+WHERE ISNULL(SUSER_NAME(role_principal_id), 'public') = 'sysadmin';
+
+DECLARE @RowCount INT;
+SET @RowCount = (SELECT COUNT(*) FROM ##SecHc_Sysadminlogin);
+
+INSERT INTO ##ScoreMasterDetail (smcID, Score)
+SELECT 
+    8, 
+    CASE 
+        WHEN @RowCount = 0 THEN (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 8)
+        WHEN @RowCount BETWEEN 1 AND 3 THEN (SELECT Warning FROM ##ScoreMasterConfig WHERE SmcID = 8)
+        ELSE (SELECT Failed FROM ##ScoreMasterConfig WHERE SmcID = 8)
+    END;
+
+
+SELECT * FROM ##SecHc_Sysadminlogin;
+
+
+IF OBJECT_ID('tempdb..##SecHc_Sysadminlogin') IS NOT NULL
+    DROP TABLE ##SecHc_Sysadminlogin;
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_Version') IS NOT NULL
+    DROP TABLE ##SecHC_Version;
+
+CREATE TABLE ##SecHC_Version (
+    [version_] NVARCHAR(600)
+);
+INSERT INTO ##SecHC_Version ([version_])
+SELECT @@VERSION;
+
+IF EXISTS (SELECT 1 FROM ##SecHC_Version WHERE version_ LIKE '%SQL Server 2019%')
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (11, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 11));
+END
+ELSE
+BEGIN
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (11, (SELECT Warning FROM ##ScoreMasterConfig WHERE SmcID = 11));
+END;
+
+
+SELECT * FROM ##SecHC_Version;
+
+IF OBJECT_ID('tempdb..##SecHC_Version') IS NOT NULL
+    DROP TABLE ##SecHC_Version;
+
+USE [master];
+GO
+IF OBJECT_ID('tempdb..##SecHC_CLR') IS NOT NULL
+    DROP TABLE ##SecHC_CLR;
+
+CREATE TABLE ##SecHC_CLR (
+    [CLR_ConfiguredValue] NVARCHAR(256)
+);
+
+
+INSERT INTO ##SecHC_CLR ([CLR_ConfiguredValue])
+SELECT CAST(value_in_use AS NVARCHAR(256))
+FROM sys.configurations
+WHERE [name] = 'clr enabled';
+
+
+IF EXISTS (SELECT 1 FROM ##SecHC_CLR WHERE CLR_ConfiguredValue = '1')
+BEGIN
+
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (14, (SELECT Warning FROM ##ScoreMasterConfig WHERE SmcID = 14));
+END
+ELSE
+BEGIN
+
+    INSERT INTO ##ScoreMasterDetail (smcID, Score)
+    VALUES (14, (SELECT Successful FROM ##ScoreMasterConfig WHERE SmcID = 14));
+END;
+
+SELECT * FROM ##SecHC_CLR;
+IF OBJECT_ID('tempdb..##SecHC_CLR') IS NOT NULL
+    DROP TABLE ##SecHC_CLR;
+
+
+
+USE [master];
+GO
+
+SELECT * FROM ##ScoreMasterDetail;
+SELECT * FROM ##ScoreMasterConfig;
+
+IF OBJECT_ID('tempdb..##ScoreMasterDetail') IS NOT NULL
+    DROP TABLE ##ScoreMasterDetail;
+IF OBJECT_ID('tempdb..##ScoreMasterConfig') IS NOT NULL
+    DROP TABLE ##ScoreMasterConfig;
+
+
+

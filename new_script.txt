@@ -1,0 +1,442 @@
+-- CPU Bilgilerini Tutacak Tabloyu Oluştur
+CREATE TABLE #CPUInfo (
+    [Logical CPU] INT,
+    [Physical CPU] INT,
+    [Socket Count] INT
+);
+
+DECLARE @Version INT;
+SET @Version = CONVERT(INT, LEFT(CONVERT(VARCHAR, SERVERPROPERTY('ProductVersion')), CHARINDEX('.', CONVERT(VARCHAR, SERVERPROPERTY('ProductVersion'))) - 1));
+
+-- SQL Server 2017 ve sonrası için işlem
+IF @Version >= 14
+BEGIN
+    INSERT INTO #CPUInfo
+    SELECT
+        cpu_count AS [Logical CPU],
+        cpu_count / hyperthread_ratio AS [Physical CPU],
+        cpu_count / hyperthread_ratio AS [Socket Count]
+    FROM sys.dm_os_sys_info;
+END
+ELSE -- SQL Server 2016 ve öncesi için işlem
+BEGIN
+    INSERT INTO #CPUInfo
+    SELECT
+        cpu_count AS [Logical CPU],
+        cpu_count / hyperthread_ratio AS [Physical CPU],
+        cpu_count / hyperthread_ratio AS [Socket Count]
+    FROM sys.dm_os_sys_info;
+END;
+
+
+
+
+IF OBJECT_ID('tempdb..#ServiceAccount') IS NOT NULL
+    DROP TABLE #ServiceAccount;
+
+CREATE TABLE #ServiceAccount (
+    [servicename] NVARCHAR(512),
+    [startup_type] INT,
+    [startup_type_desc] NVARCHAR(512),
+    [status] INT,
+    [status_desc] NVARCHAR(512),
+    [process_id] INT,
+    [last_startup_time] NVARCHAR(50),  -- DATETIMEOFFSET yerine NVARCHAR kullanıldı
+    [service_account] NVARCHAR(512),
+    [filename] NVARCHAR(512),
+    [is_clustered] NVARCHAR(2),
+    [cluster_nodename] NVARCHAR(512)
+);
+
+INSERT INTO #ServiceAccount
+SELECT
+    servicename,
+    startup_type,
+    startup_type_desc,
+    status,
+    status_desc,
+    process_id,
+    CONVERT(NVARCHAR(50), last_startup_time, 120),
+    service_account,
+    filename,
+    is_clustered,
+    cluster_nodename
+FROM sys.dm_server_services;
+
+
+IF OBJECT_ID('tempdb..#SaAccount') IS NOT NULL
+    DROP TABLE #SaAccount;
+
+CREATE TABLE #SaAccount (
+    [Name] NVARCHAR(256),
+    [Status] NVARCHAR(256)
+);
+INSERT INTO #SaAccount ([Name], [Status])
+SELECT name, CASE WHEN is_disabled = 1 THEN 'Disabled' ELSE 'Enabled' END
+FROM sys.sql_logins WHERE principal_id = 1;
+
+
+IF OBJECT_ID('tempdb..#Xpcmdshell') IS NOT NULL
+    DROP TABLE #Xpcmdshell;
+
+CREATE TABLE #Xpcmdshell (
+    [xp_cmdshell_configuredvalue] NVARCHAR(256)
+);
+INSERT INTO #Xpcmdshell ([xp_cmdshell_configuredvalue])
+SELECT CAST(value_in_use AS NVARCHAR(256))
+FROM sys.configurations
+WHERE [name] = 'xp_cmdshell';
+
+CREATE TABLE #LoginMode (
+    Sunucu NVARCHAR(255),
+    [Login Mode] NVARCHAR(50)
+);
+
+-- Login Mode'u Öğren ve Tabloya Ekle
+INSERT INTO #LoginMode
+SELECT
+    CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')) AS [Sunucu],
+    CASE
+        WHEN ISNULL((SELECT value_in_use FROM sys.configurations WHERE name = 'login mode'), 0) = 1 THEN 'Windows Authentication'
+        WHEN ISNULL((SELECT value_in_use FROM sys.configurations WHERE name = 'login mode'), 0) = 2 THEN 'SQL Server and Windows Authentication (Mixed Mode)'
+        ELSE 'Bilinmiyor'
+    END AS [Login Mode];
+
+
+IF OBJECT_ID('tempdb..#Sysadminlogin') IS NOT NULL
+    DROP TABLE #Sysadminlogin;
+
+CREATE TABLE #Sysadminlogin (
+    [Name] NVARCHAR(50),
+    [LoginType] NVARCHAR(50),
+    [AssociatedServerRole] NVARCHAR(50),
+    [Status] NVARCHAR(50)
+);
+
+INSERT INTO #Sysadminlogin ([Name], [LoginType], [AssociatedServerRole], [Status])
+SELECT name, type_desc, ISNULL(SUSER_NAME(role_principal_id), 'public'),
+    CASE WHEN is_disabled = 1 THEN 'Disabled' ELSE 'Enabled' END
+FROM sys.server_principals
+LEFT JOIN sys.server_role_members ON principal_id = member_principal_id
+WHERE ISNULL(SUSER_NAME(role_principal_id), 'public') = 'sysadmin';
+
+
+
+
+
+
+-- Geçici tabloyu oluştur
+IF OBJECT_ID('tempdb..#BadIndex') IS NOT NULL
+    DROP TABLE #BadIndex;
+
+CREATE TABLE #BadIndex (
+    TableName NVARCHAR(255),
+    IndexName NVARCHAR(255),
+    IndexID INT,
+    TotalWrites BIGINT,
+    TotalReads BIGINT,
+    Difference BIGINT,
+    DropStatement NVARCHAR(MAX)
+);
+
+INSERT INTO #BadIndex (TableName, IndexName, IndexID, TotalWrites, TotalReads, Difference, DropStatement)
+SELECT
+    OBJECT_NAME(s.[object_id]) AS TableName,
+    i.name AS IndexName,
+    i.index_id,
+    user_updates AS TotalWrites,
+    user_seeks + user_scans + user_lookups AS TotalReads,
+    user_updates - (user_seeks + user_scans + user_lookups) AS Difference,
+    'DROP INDEX ' + QUOTENAME(REPLACE(i.name, '''', '''''')) + ' ON ' + QUOTENAME(REPLACE(OBJECT_NAME(s.object_id), '''', '''''')) AS DropStatement
+FROM sys.dm_db_index_usage_stats AS s WITH (NOLOCK)
+INNER JOIN sys.indexes AS i WITH (NOLOCK)
+    ON s.[object_id] = i.[object_id] AND i.index_id = s.index_id
+WHERE OBJECTPROPERTY(s.[object_id],'IsUserTable') = 1
+    AND s.database_id = DB_ID()
+    AND user_updates > (user_seeks + user_scans + user_lookups)
+    AND i.index_id > 1;
+
+
+-- Geçici tabloyu oluştur
+IF OBJECT_ID('tempdb..#ReIndex') IS NOT NULL
+    DROP TABLE #ReIndex;
+
+CREATE TABLE #ReIndex (
+    TableName NVARCHAR(255),
+    IndexName NVARCHAR(255),
+    IndexID INT,
+    AvgFragmentationPercent FLOAT,
+    ReIndexCommand NVARCHAR(MAX)
+);
+
+-- Sorgunun sonuçlarını geçici tabloya ekle
+INSERT INTO #ReIndex (TableName, IndexName, IndexID, AvgFragmentationPercent, ReIndexCommand)
+SELECT
+    OBJECT_NAME(ps.object_id) AS TableName,
+    i.name AS IndexName,
+    ps.index_id,
+    ps.avg_fragmentation_in_percent,
+    CASE
+        WHEN ps.avg_fragmentation_in_percent >= 30 THEN
+            'ALTER INDEX ' + QUOTENAME(i.name) + ' ON ' + QUOTENAME(OBJECT_NAME(ps.object_id)) + ' REBUILD WITH (ONLINE = ON);'
+        WHEN ps.avg_fragmentation_in_percent >= 10 THEN
+            'ALTER INDEX ' + QUOTENAME(i.name) + ' ON ' + QUOTENAME(OBJECT_NAME(ps.object_id)) + ' REORGANIZE;'
+        ELSE
+            'Index fragmentation is low. No action needed.'
+    END AS ReIndexCommand
+FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') AS ps
+INNER JOIN sys.indexes AS i
+    ON ps.object_id = i.object_id
+    AND ps.index_id = i.index_id
+ORDER BY ps.avg_fragmentation_in_percent DESC;
+
+
+IF OBJECT_ID('tempdb..#LeftoverFakeIndex') IS NOT NULL
+    DROP TABLE #LeftoverFakeIndex;
+
+CREATE TABLE #LeftoverFakeIndex (
+    TableName NVARCHAR(255),
+    IndexOrStatistics NVARCHAR(255),
+    TypeDescription NVARCHAR(50),
+    DropCommand NVARCHAR(MAX)
+);
+
+-- Geçici CTE kullanarak veri ekleme
+WITH hi AS (
+    SELECT
+        QUOTENAME(SCHEMA_NAME(o.[schema_id])) + '.' + QUOTENAME(REPLACE(OBJECT_NAME(i.[object_id]), '''', '''''')) AS TableName,
+        QUOTENAME(REPLACE(i.[name], '''', '''''')) AS IndexOrStatistics,
+        1 AS Type
+    FROM sys.[indexes] AS i
+    JOIN sys.[objects] AS o ON i.[object_id] = o.[object_id]
+    WHERE INDEXPROPERTY(i.[object_id], i.[name], 'IsHypothetical') = 1
+    AND OBJECTPROPERTY(o.[object_id], 'IsUserTable') = 1
+
+    UNION ALL
+
+    SELECT
+        QUOTENAME(SCHEMA_NAME(o.[schema_id])) + '.' + QUOTENAME(REPLACE(OBJECT_NAME(o.[object_id]), '''', '''''')) AS TableName,
+        QUOTENAME(REPLACE(s.[name], '''', '''''')) AS IndexOrStatistics,
+        2 AS Type
+    FROM sys.[stats] AS s
+    JOIN sys.[objects] AS o ON o.[object_id] = s.[object_id]
+    WHERE s.[user_created] = 0
+    AND o.[name] LIKE '[_]dta[_]%'
+    AND OBJECTPROPERTY(o.[object_id], 'IsUserTable') = 1
+)
+
+-- Sonuçları LeftoverFakeIndex tablosuna ekle
+INSERT INTO #LeftoverFakeIndex (TableName, IndexOrStatistics, TypeDescription, DropCommand)
+SELECT
+    hi.TableName,
+    hi.IndexOrStatistics,
+    CASE hi.Type
+        WHEN 1 THEN 'Hypothetical Index'
+        WHEN 2 THEN 'Auto-Generated Statistics'
+        ELSE 'Unknown'
+    END AS TypeDescription,
+    CASE hi.Type
+        WHEN 1 THEN 'DROP INDEX ' + hi.IndexOrStatistics + ' ON ' + hi.TableName + ';'
+        WHEN 2 THEN 'DROP STATISTICS ' + hi.TableName + '.' + hi.IndexOrStatistics + ';'
+        ELSE 'DROP COMMAND NOT AVAILABLE'
+    END AS DropCommand
+FROM hi;
+
+
+
+-- Geçici tabloyu oluştur
+IF OBJECT_ID('tempdb..#UpdateStats') IS NOT NULL
+    DROP TABLE #UpdateStats;
+
+CREATE TABLE #UpdateStats (
+    TableName NVARCHAR(255),
+    LastStatsUpdateTime DATETIME,
+    UpdateStatsCommand NVARCHAR(MAX)
+);
+
+-- Sorgunun sonuçlarını geçici tabloya ekle
+INSERT INTO #UpdateStats (TableName, LastStatsUpdateTime, UpdateStatsCommand)
+SELECT
+    OBJECT_NAME(s.object_id) AS TableName,
+    sp.last_updated AS LastStatsUpdateTime,
+    'UPDATE STATISTICS ' + QUOTENAME(OBJECT_NAME(s.object_id)) + ' WITH FULLSCAN;' AS UpdateStatsCommand
+FROM sys.stats AS s
+CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) AS sp
+WHERE OBJECTPROPERTY(s.object_id, 'IsUserTable') = 1
+ORDER BY sp.last_updated DESC;
+-- Geçici tabloyu oluştur
+IF OBJECT_ID('tempdb..#MissingIndexCount') IS NOT NULL
+    DROP TABLE #MissingIndexCount;
+
+CREATE TABLE #MissingIndexCount (
+    DatabaseName NVARCHAR(255),
+    IndexCount INT
+);
+
+-- Geçici tabloya verileri ekle
+INSERT INTO #MissingIndexCount (DatabaseName, IndexCount)
+SELECT
+    t1.DatabaseName,  -- Düzeltildi
+    COUNT(1) AS IndexCount
+FROM (
+    -- Eksik indekslerin detaylarını çeken alt sorgu
+    SELECT
+        DB_NAME(id.database_id) AS DatabaseName,  -- Düzeltildi
+        id.statement AS TableName,
+        id.equality_columns,
+        id.inequality_columns,
+        gs.last_user_seek,
+        gs.avg_total_user_cost * gs.avg_user_impact * (gs.user_seeks + gs.user_scans) / 100 AS ImprovementValue,
+        gs.user_seeks,
+        gs.user_scans,
+        'CREATE NONCLUSTERED INDEX dpIX_'
+        + FORMAT(GETDATE(), 'yyyyMMdd_')
+        + REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(id.equality_columns, ''), '[', ''), ']', ''), ',', '_'), ' ', '')
+        + '_'
+        + REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(id.inequality_columns, ''), '[', ''), ']', ''), ',', '_'), ' ', '')
+        + ' ON ' + id.statement
+        + '('
+        + ISNULL(id.equality_columns, '')
+        + CASE WHEN id.inequality_columns IS NULL THEN '' ELSE ',' + id.inequality_columns END
+        + ') '
+        + CASE WHEN id.included_columns IS NULL THEN '' ELSE ' INCLUDE (' + id.included_columns + ') WITH (ONLINE=ON)' END
+        AS IndexName,
+        'dpIX_'
+        + REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(id.equality_columns, ''), '[', ''), ']', ''), ',', '_'), ' ', '')
+        + '_'
+        + REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(id.inequality_columns, ''), '[', ''), ']', ''), ',', '_'), ' ', '')
+        AS IName,
+        CONVERT(DATE, GETDATE() - 1) AS Tarih
+    FROM sys.dm_db_missing_index_group_stats gs
+    INNER JOIN sys.dm_db_missing_index_groups ig ON gs.group_handle = ig.index_group_handle
+    INNER JOIN sys.dm_db_missing_index_details id ON id.index_handle = ig.index_handle
+    WHERE avg_user_impact > 50
+) AS t1
+GROUP BY DatabaseName  -- Düzeltildi
+HAVING COUNT(1) > 10;
+
+
+
+
+-- Geçici tabloyu oluştur
+IF OBJECT_ID('tempdb..#ClusteredIndexes') IS NOT NULL
+    DROP TABLE #ClusteredIndexes;
+
+CREATE TABLE #ClusteredIndexes (
+    SchemaName NVARCHAR(255),
+    TableName NVARCHAR(255),
+    IndexName NVARCHAR(255),
+    IndexID INT,
+    IndexType NVARCHAR(50),
+    IsUnique BIT,
+    FragmentationPercent FLOAT
+);
+
+-- Clustered index bilgilerini geçici tabloya ekle
+INSERT INTO #ClusteredIndexes (SchemaName, TableName, IndexName, IndexID, IndexType, IsUnique, FragmentationPercent)
+SELECT
+    SCHEMA_NAME(o.schema_id) AS SchemaName,
+    OBJECT_NAME(i.object_id) AS TableName,
+    i.name AS IndexName,
+    i.index_id,
+    i.type_desc AS IndexType,
+    i.is_unique AS IsUnique,
+    ps.avg_fragmentation_in_percent AS FragmentationPercent
+FROM sys.indexes i
+INNER JOIN sys.objects o ON i.object_id = o.object_id
+LEFT JOIN sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') ps
+    ON i.object_id = ps.object_id AND i.index_id = ps.index_id
+WHERE i.type_desc = 'CLUSTERED'
+AND OBJECTPROPERTY(i.object_id, 'IsUserTable') = 1
+ORDER BY SchemaName, TableName;
+
+-- xp_cmdshell'in açık olup olmadığını kontrol etmek için değişken oluştur
+DECLARE @IsCmdShellEnabled INT;
+
+SELECT @IsCmdShellEnabled = CONVERT(INT, value_in_use)
+FROM sys.configurations
+WHERE name = 'xp_cmdshell';
+
+-- Eğer xp_cmdshell kapalıysa, aç
+IF @IsCmdShellEnabled = 0
+BEGIN
+    EXEC sp_configure 'show advanced options', 1;
+    RECONFIGURE;
+    EXEC sp_configure 'xp_cmdshell', 1;
+    RECONFIGURE;
+END
+
+-- Eğer geçici tablo varsa sil
+IF OBJECT_ID('tempdb..#SQLBrowserStatus') IS NOT NULL
+    DROP TABLE #SQLBrowserStatus;
+
+-- CMD çıktısını saklamak için geçici tabloyu oluştur
+CREATE TABLE #SQLBrowserStatus (
+    OutputLine NVARCHAR(255)
+);
+
+-- CMD çıktısını geçici tabloya ekle
+INSERT INTO #SQLBrowserStatus (OutputLine)
+EXEC xp_cmdshell 'sc query "SQLBrowser"';
+
+-- ServiceName ve State ayrıştırılmış olarak saklamak için geçici tablo
+IF OBJECT_ID('tempdb..#ParsedSQLBrowser') IS NOT NULL
+    DROP TABLE #SQLServerBrowser;
+
+CREATE TABLE #SQLServerBrowser (
+    ServiceName NVARCHAR(255),
+    State NVARCHAR(50)
+);
+
+-- Servis adı ve durumunu ayrıştır ve yeni tabloya ekle
+INSERT INTO #SQLServerBrowser (ServiceName, State)
+SELECT
+    (SELECT TOP 1 SUBSTRING(OutputLine, CHARINDEX(':', OutputLine) + 2, LEN(OutputLine))
+     FROM #SQLBrowserStatus WHERE OutputLine LIKE 'SERVICE_NAME:%') AS ServiceName,
+    (SELECT TOP 1
+        CASE
+            WHEN OutputLine LIKE '%STATE%1%' THEN 'Stopped'
+            WHEN OutputLine LIKE '%STATE%4%' THEN 'Running'
+            ELSE 'Unknown'
+        END
+     FROM #SQLBrowserStatus WHERE OutputLine LIKE '%STATE%')
+AS State;
+
+-- Sonucu göster
+
+
+-- İşlem tamamlandıktan sonra geçici tabloları temizle
+
+
+-- Eğer xp_cmdshell başlangıçta kapalıysa, tekrar kapat
+IF @IsCmdShellEnabled = 0
+BEGIN
+    EXEC sp_configure 'xp_cmdshell', 0;
+    RECONFIGURE;
+    EXEC sp_configure 'show advanced options', 0;
+    RECONFIGURE;
+END
+
+
+
+-- Sonuçları görüntüle
+SELECT * FROM #MissingIndexCount;
+SELECT * FROM #ClusteredIndexes;
+SELECT * FROM #SQLServerBrowser;
+SELECT * FROM #CPUInfo;
+SELECT * FROM #ServiceAccount;
+SELECT * FROM #SaAccount;
+SELECT * FROM #Xpcmdshell;
+SELECT * FROM #LoginMode;
+SELECT * FROM #BadIndex;
+SELECT * FROM #ReIndex;
+SELECT * FROM #LeftoverFakeIndex;
+SELECT * FROM #UpdateStats;
+SELECT * FROM #Sysadminlogin;
+
+
+
+
+
+
+

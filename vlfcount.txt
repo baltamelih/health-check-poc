@@ -1,0 +1,46 @@
+IF OBJECT_ID('tempdb..#VLFInfo') IS NOT NULL
+BEGIN
+    DROP TABLE #VLFInfo;
+END
+
+IF OBJECT_ID('tempdb..#VLFCountResults') IS NOT NULL
+BEGIN
+    DROP TABLE #VLFCountResults;
+END
+
+
+----------------------------VLF Counts--------------------------------------------------------------
+CREATE TABLE #VLFInfo (
+    RecoveryUnitID INT,
+    FileID INT,
+    FileSize BIGINT,
+    StartOffset BIGINT,
+    FSeqNo BIGINT,
+    [Status] BIGINT,
+    Parity BIGINT,
+    CreateLSN NUMERIC(38)
+);
+
+CREATE TABLE #VLFCountResults (
+    DatabaseName SYSNAME,
+    VLFCount INT
+);
+DECLARE @SQL NVARCHAR(MAX);
+
+SET @SQL =
+'USE [?];
+
+INSERT INTO #VLFInfo
+EXEC sp_executesql N''DBCC LOGINFO([?])'';
+
+INSERT INTO #VLFCountResults
+SELECT DB_NAME(), COUNT(*)
+FROM #VLFInfo;
+
+TRUNCATE TABLE #VLFInfo;';
+-- Insert VLF counts into the temporary table
+EXEC sp_MSforeachdb @SQL;
+
+
+
+SELECT * FROM #VLFCountResults;

@@ -1,0 +1,13 @@
+# Required dependencies for requirements.txt file 'pip install -r requirements.txt'
+matplotlib
+PyPDF2
+reportlab
+numpy
+pillow
+chardet
+cryptography
+PyQt5
+pyodbc
+pandas
+openpyxl
+charset_normalizer

@@ -1,0 +1,118 @@
+IF OBJECT_ID('tempdb..#PowerShellOutput') IS NOT NULL
+BEGIN
+    DROP TABLE #PowerShellOutput;
+END
+DECLARE @InitialAdvancedOptionsSetting BIT;
+DECLARE @InitialXpCmdShellSetting BIT;
+DECLARE @xpCmdShellEnabled BIT;
+
+-- Check the current status of 'xp_cmdshell'
+SELECT @xpCmdShellEnabled = CAST(value_in_use AS INT)
+FROM sys.configurations
+WHERE name = 'xp_cmdshell';
+
+-- Temporarily enable 'xp_cmdshell' if disabled
+IF @xpCmdShellEnabled = 0
+BEGIN
+    EXEC sp_configure 'show advanced options', 1;
+    RECONFIGURE;
+    EXEC sp_configure 'xp_cmdshell', 1;
+    RECONFIGURE;
+END
+
+-- Create a temporary table for PowerShell output
+CREATE TABLE #PowerShellOutput (
+    Output NVARCHAR(MAX)
+);
+
+-- Execute the PowerShell command and store only the scheme name
+INSERT INTO #PowerShellOutput (Output)
+EXEC xp_cmdshell 'powershell -Command "(powercfg /GetActiveScheme) -replace ''^.\((.?)\)$'', ''$1''"' ;
+
+-- Delete NULL or empty rows
+DELETE FROM #PowerShellOutput WHERE Output IS NULL OR Output = '';
+
+-- Format the result: "High Performance" to "HighPerformance"
+UPDATE #PowerShellOutput
+SET Output = CASE
+                WHEN Output = 'High Performance' THEN 'HighPerformance'
+                ELSE Output
+             END;
+
+-- Restore 'xp_cmdshell' to its initial state
+IF @xpCmdShellEnabled = 0
+BEGIN
+    EXEC sp_configure 'xp_cmdshell', 0;
+    RECONFIGURE;
+    EXEC sp_configure 'show advanced options', 0;
+    RECONFIGURE;
+END
+
+
+
+
+IF OBJECT_ID('tempdb..#SystemDrive') IS NOT NULL
+BEGIN
+    DROP TABLE #SystemDrive;
+END
+
+
+
+---------------------------------------------System disk----------------------------------------------------------------------
+
+
+-- Check 'show advanced options' and 'xp_cmdshell' statuses
+SELECT @InitialAdvancedOptionsSetting = CONVERT(BIT, value_in_use)
+FROM sys.configurations
+WHERE name = 'show advanced options';
+
+SELECT @InitialXpCmdShellSetting = CONVERT(BIT, value_in_use)
+FROM sys.configurations
+WHERE name = 'xp_cmdshell';
+
+-- Enable 'show advanced options' if disabled
+IF @InitialAdvancedOptionsSetting = 0
+BEGIN
+    EXEC sp_configure 'show advanced options', 1;
+    RECONFIGURE;
+END
+
+-- Enable 'xp_cmdshell' if disabled
+IF @InitialXpCmdShellSetting = 0
+BEGIN
+    EXEC sp_configure 'xp_cmdshell', 1;
+    RECONFIGURE;
+END
+
+-- Create a temporary table
+CREATE TABLE #SystemDrive (
+    Output NVARCHAR(MAX)
+);
+
+-- Get the system drive and store it in the table
+INSERT INTO #SystemDrive
+EXEC xp_cmdshell 'powershell -Command "[System.Environment]::GetEnvironmentVariable(\"SystemDrive\")"';
+
+-- Remove NULL or empty rows
+DELETE FROM #SystemDrive WHERE Output IS NULL OR LTRIM(RTRIM(Output)) = '';
+
+-- Restore 'xp_cmdshell' and 'show advanced options' to initial settings
+IF @InitialXpCmdShellSetting = 0
+BEGIN
+    EXEC sp_configure 'xp_cmdshell', 0;
+    RECONFIGURE;
+END
+
+IF @InitialAdvancedOptionsSetting = 0
+BEGIN
+    EXEC sp_configure 'show advanced options', 0;
+    RECONFIGURE;
+END
+
+
+---------------------------------------powerplan--------------------------------------
+
+
+SELECT * FROM #PowerShellOutput;
+SELECT * FROM #SystemDrive;
+

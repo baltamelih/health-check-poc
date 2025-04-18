@@ -1,0 +1,38 @@
+IF OBJECT_ID('tempdb..[#BackupLogRunning]') IS NOT NULL
+BEGIN
+    DROP TABLE [#BackupLogRunning];
+END
+CREATE TABLE [#BackupLogRunning] (
+    session_id INT,
+    start_time DATETIME,
+    status NVARCHAR(50),
+    command NVARCHAR(255),
+    database_id INT,
+    database_name NVARCHAR(255),
+    percent_complete FLOAT,
+    wait_type NVARCHAR(255),
+    wait_time INT,
+    wait_resource NVARCHAR(255)
+)
+-- Insert data into the temporary table
+INSERT INTO [#BackupLogRunning]
+SELECT
+    r.session_id,
+    ISNULL(r.start_time, '1900-01-01 00:00:00') AS start_time, -- Tarih için varsayılan değer
+    ISNULL(r.status, 'NONE') AS status, -- NVARCHAR için 'NONE'
+    ISNULL(r.command, 'NONE') AS command, -- NVARCHAR için 'NONE'
+    r.database_id,
+    ISNULL(db.name, 'NONE') AS database_name, -- NVARCHAR için 'NONE'
+    ISNULL(r.percent_complete, 0) AS percent_complete, -- FLOAT için 0
+    ISNULL(r.wait_type, 'NONE') AS wait_type, -- NVARCHAR için 'NONE'
+    ISNULL(r.wait_time, 0) AS wait_time, -- INT için 0
+    ISNULL(r.wait_resource, 'NONE') AS wait_resource -- NVARCHAR için 'NONE'
+FROM sys.dm_exec_requests r
+INNER JOIN sys.databases db
+    ON r.database_id = db.database_id
+WHERE r.command LIKE 'BACKUP LOG'
+  AND r.status = 'running';
+
+
+SELECT * FROM #BackupLogRunning;
+

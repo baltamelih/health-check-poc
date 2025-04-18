@@ -1,0 +1,26 @@
+IF OBJECT_ID('tempdb..#PolicyNotCheckedLogins') IS NOT NULL
+BEGIN
+    DROP TABLE #PolicyNotCheckedLogins;
+END
+
+CREATE TABLE #PolicyNotCheckedLogins (
+    name NVARCHAR(255),
+    is_policy_checked BIT,
+    is_expiration_checked BIT
+);
+
+begin TRY
+    INSERT INTO #PolicyNotCheckedLogins
+    SELECT [name], is_policy_checked, is_expiration_checked
+    FROM sys.sql_logins
+    WHERE is_policy_checked = 0; -- Check for logins without policy enforcement
+
+
+END TRY
+begin CATCH
+    PRINT 'An error occurred while checking for logins without enforced policies.';
+END CATCH
+
+SELECT * FROM #PolicyNotCheckedLogins;
+
+
