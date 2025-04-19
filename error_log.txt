@@ -4238,3 +4238,39 @@ Traceback (most recent call last):
 TypeError: critical(parent: Optional[QWidget], title: Optional[str], text: Optional[str], buttons: Union[QMessageBox.StandardButtons, QMessageBox.StandardButton] = QMessageBox.Ok, defaultButton: QMessageBox.StandardButton = QMessageBox.NoButton): argument 1 has unexpected type 'str'
 
 
+2025-04-19 14:11:48.823479 - Error: 'QWidget' object has no attribute 'progress_overlay'
+Function: font_path
+Stack Trace:
+Traceback (most recent call last):
+  File "C:\Users\90544\PycharmProjects\health-check-report\health-check-v1.2.py", line 2361, in generate_pdf_report
+    main_ui.progress_overlay.show()
+AttributeError: 'QWidget' object has no attribute 'progress_overlay'
+
+
+2025-04-19 14:11:49.041422 - Error: local variable 'summary_df' referenced before assignment
+Function: excel_writer
+Stack Trace:
+Traceback (most recent call last):
+  File "C:\Users\90544\PycharmProjects\health-check-report\health-check-v1.2.py", line 2377, in generate_pdf_report
+    summary_df.to_excel(writer, sheet_name='DataFrame', index=False)
+UnboundLocalError: local variable 'summary_df' referenced before assignment
+
+
+2025-04-19 14:11:49.041422 - Error: critical(parent: Optional[QWidget], title: Optional[str], text: Optional[str], buttons: Union[QMessageBox.StandardButtons, QMessageBox.StandardButton] = QMessageBox.Ok, defaultButton: QMessageBox.StandardButton = QMessageBox.NoButton): argument 1 has unexpected type 'str'
+Function: run_script
+Stack Trace:
+Traceback (most recent call last):
+  File "C:\Users\90544\PycharmProjects\health-check-report\health-check-v1.2.py", line 2377, in generate_pdf_report
+    summary_df.to_excel(writer, sheet_name='DataFrame', index=False)
+UnboundLocalError: local variable 'summary_df' referenced before assignment
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\90544\PycharmProjects\health-check-report\health-check-v1.2.py", line 2811, in run_scripts_and_export
+    pdf_path = self.generate_pdf_report(output_path, output_dir, valid_username, rundate)
+  File "C:\Users\90544\PycharmProjects\health-check-report\health-check-v1.2.py", line 2380, in generate_pdf_report
+    QMessageBox.critical('Error','An error occurred, the Excel file could not be read.')
+TypeError: critical(parent: Optional[QWidget], title: Optional[str], text: Optional[str], buttons: Union[QMessageBox.StandardButtons, QMessageBox.StandardButton] = QMessageBox.Ok, defaultButton: QMessageBox.StandardButton = QMessageBox.NoButton): argument 1 has unexpected type 'str'
+
+
