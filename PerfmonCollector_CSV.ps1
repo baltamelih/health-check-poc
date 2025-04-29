@@ -3,10 +3,14 @@ param([int]$duration = 24)
 # Süreyi hesapla
 $endTime = (Get-Date).AddHours($duration)
 
+# Script dosyasının çalıştığı dizini bul
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
 # CSV dosyası adını oluştur
 $serverName = $env:COMPUTERNAME
 $dateStamp = Get-Date -Format "yyyyMMdd_HHmm"
-$csvFilePath = "$serverName`_$dateStamp.csv"
+$csvFileName = "$serverName" + "_" + "$dateStamp.csv"
+$csvFilePath = Join-Path $scriptDir $csvFileName
 
 # İzlenecek performans sayaçları
 $counters = @(
@@ -31,26 +35,43 @@ $counters = @(
 $sampleInterval = 60  # saniye
 
 # CSV başlığı oluşturulmamışsa ekle
-if (!(Test-Path -Path $csvFilePath)) {
-    "CounterName,InstanceName,CounterValue,CollectionDateTime" | Out-File -FilePath $csvFilePath -Encoding UTF8
+try {
+    if (!(Test-Path -Path $csvFilePath)) {
+        "CounterName,InstanceName,CounterValue,CollectionDateTime" | Out-File -FilePath $csvFilePath -Encoding UTF8
+    }
+}
+catch {
+    Write-Output "CSV başlığı yazılamadı: $_"
+    exit 1
 }
 
 # Süre dolana kadar veriyi topla
 while ((Get-Date) -lt $endTime) {
-    $performanceData = Get-Counter -Counter $counters -SampleInterval 1 -MaxSamples 1
-    $counterSamples = $performanceData.CounterSamples
+    try {
+        $performanceData = Get-Counter -Counter $counters -SampleInterval 1 -MaxSamples 1
+        $counterSamples = $performanceData.CounterSamples
 
-    foreach ($sample in $counterSamples) {
-        $counterName = $sample.Path
-        $instanceName = $sample.InstanceName
-        $counterValue = $sample.CookedValue
-        $timestamp = Get-Date
+        foreach ($sample in $counterSamples) {
+            $counterName = $sample.Path
+            $instanceName = $sample.InstanceName
+            $counterValue = $sample.CookedValue
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
-        $csvRow = "$counterName,$instanceName,$counterValue,$timestamp"
-        Add-Content -Path $csvFilePath -Value $csvRow
+            $csvRow = "$counterName,$instanceName,$counterValue,$timestamp"
+
+            try {
+                $csvRow | Out-File -FilePath $csvFilePath -Encoding UTF8 -Append
+            }
+            catch {
+                Write-Output "Veri yazılamadı: $_"
+            }
+        }
+    }
+    catch {
+        Write-Output "Sayaç hatası: $_"
     }
 
     Start-Sleep -Seconds $sampleInterval
 }
 
-Write-Output "Veri toplama tamamlandı: $csvFilePath"
+Write-Output "`n✅ Veri toplama tamamlandı: $csvFilePath"

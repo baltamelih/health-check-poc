@@ -46,7 +46,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtWidgets import (
     QProgressBar,QTextEdit,QWidget, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QComboBox,
-    QCheckBox, QPushButton, QMessageBox, QDateEdit, QListWidget, QRadioButton, QStackedWidget
+    QCheckBox, QPushButton, QMessageBox, QDateEdit, QListWidget, QRadioButton, QStackedWidget,QDateTimeEdit
 )
 from PyQt5.QtCore import QDateTime
 from PyQt5.QtGui import QPixmap
@@ -71,7 +71,9 @@ import threading
 import time
 import os
 from PyQt5.QtWidgets import QInputDialog
-
+import subprocess
+import signal
+from PyQt5.QtCore import QTimer
 
 
 class ConsentWindow(QWidget):
@@ -238,6 +240,7 @@ class CheckListWindow(QWidget):
 class SQLServerConnectionUI(QWidget):
     def __init__(self):
         super().__init__()
+        self.timer = QTimer()
         self.current_user = self.get_windows_user()
         self.connection = None
         self.key = self.load_or_generate_key()  # sifreleme anahtarını yükle veya olustur
@@ -289,7 +292,7 @@ class SQLServerConnectionUI(QWidget):
     def initUI(self):
         try:
             self.setWindowTitle("DAPLAIT HEALTH CHECK")
-            self.resize(450, 300)
+            self.resize(400, 350)
 
             # Layout
             grid = QGridLayout()
@@ -303,47 +306,77 @@ class SQLServerConnectionUI(QWidget):
 
             # Server Name
 
-            grid.addWidget(QLabel("Server name:"), 1, 0)
+            grid.addWidget(QLabel("Server name:"), 0, 0)
             self.server_name = QLineEdit()
-            grid.addWidget(self.server_name, 1, 1)
+            grid.addWidget(self.server_name, 0, 1)
 
             # Authentication
-            grid.addWidget(QLabel("Authentication:"), 2, 0)
+            grid.addWidget(QLabel("Authentication:"), 1, 0)
             self.auth_type = QComboBox()
             self.auth_type.addItems(["SQL Server Authentication", "Windows Authentication"])
             self.auth_type.currentIndexChanged.connect(self.toggle_authentication)
-            grid.addWidget(self.auth_type, 2, 1)
+            grid.addWidget(self.auth_type, 1, 1)
 
             # Login
-            grid.addWidget(QLabel("Login:"), 3, 0)
+            grid.addWidget(QLabel("Login:"), 2, 0)
             self.login = QLineEdit()
-            grid.addWidget(self.login, 3, 1)
+            grid.addWidget(self.login, 2, 1)
 
             # Password
-            grid.addWidget(QLabel("Password:"), 4, 0)
+            grid.addWidget(QLabel("Password:"), 3, 0)
             self.password = QLineEdit()
             self.password.setEchoMode(QLineEdit.Password)
-            grid.addWidget(self.password, 4, 1)
+            grid.addWidget(self.password, 3, 1)
 
             # Remember Password
             self.remember_password = QCheckBox("Remember password")
             self.remember_password.stateChanged.connect(self.save_credentials)
-            grid.addWidget(self.remember_password, 5, 1)
-            # SQLServerConnectionUI sınıfının initUI fonksiyonuna şunu ekle:
-            self.ps_button = QPushButton("Collect Performance Metrics")
+            grid.addWidget(self.remember_password, 4, 1)
+
+            # Start Time
+            grid.addWidget(QLabel("Start Time:"), 5, 0)
+            self.start_time = QDateTimeEdit(QDateTime.currentDateTime())
+            self.start_time.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+            grid.addWidget(self.start_time, 5, 1)
+
+            # Duration
+            grid.addWidget(QLabel("Çalışma süresi (saat):"), 6, 0)
+            self.duration_choice = QComboBox()
+            self.duration_choice.addItems(["1", "3", "6", "12", "24"])
+            self.duration_choice.setCurrentText("24")
+            grid.addWidget(self.duration_choice, 6, 1)
+
+            # Progress bar
+            self.progress_bar = QProgressBar()
+            self.progress_bar.setValue(0)
+            grid.addWidget(self.progress_bar, 7, 0, 1, 2)
+
+            self.status_label = QLabel("Hazır")
+            grid.addWidget(self.status_label, 8, 0, 1, 2)
+
+
+            # Başlat (Collect) Butonu
+            self.ps_button = QPushButton("Başlat (Topla)")
             self.ps_button.clicked.connect(self.run_powershell_script)
-            grid.addWidget(self.ps_button, 8, 0, 1, 2)
+            grid.addWidget(self.ps_button, 9, 0, 1, 2)
+
+            # Durdur Butonu
+            self.stop_button = QPushButton("Durdur")
+            self.stop_button.clicked.connect(self.stop_collection)
+            grid.addWidget(self.stop_button, 10, 0, 1, 2)
+
 
             # Connect Button
             self.connect_button = QPushButton("Connect")
             self.connect_button.clicked.connect(self.test_connection)
-            grid.addWidget(self.connect_button, 6, 0, 1, 2)
+            grid.addWidget(self.connect_button, 11, 0, 1, 2)
 
             # Export Button
             self.export_button = QPushButton("Run Scripts and Export PDF")
             self.export_button.clicked.connect(self.run_scripts_and_export)
             self.export_button.setDisabled(True)
-            grid.addWidget(self.export_button, 7, 0, 1, 2)
+            grid.addWidget(self.export_button, 12, 0, 1, 2)
+
             # Report Comparison Button
 
             # Load Saved Credentials
@@ -355,36 +388,108 @@ class SQLServerConnectionUI(QWidget):
             return
     
     def run_powershell_script(self):
-            duration_hours, ok = QInputDialog.getDouble(
-                self, "Çalışma Süresi", "Kaç saat çalıştırılsın?", decimals=2, min=0.1, max=48.0
-            )
-            if not ok:
+        try:
+            # 1️⃣ Kullanıcının seçtiği çalışma süresini (saat) al ve bir değişkene ata
+            self.duration_hours = int(self.duration_choice.currentText())
+
+            # 2️⃣ .ps1 script path'ini bul (önceki mesajlardaki kodla)
+            if getattr(sys, 'frozen', False):
+                base_path = os.path.dirname(sys.executable)
+            else:
+                base_path = os.path.dirname(os.path.abspath(__file__))
+
+            ps_script_path = os.path.join(base_path, "PerfmonCollector_CSV.ps1")
+            if not os.path.exists(ps_script_path):
+                QMessageBox.critical(self, "Dosya Bulunamadı", f".ps1 dosyası bulunamadı:\n{ps_script_path}")
                 return
 
-            server_name = self.server_name.text().replace("\\", "_")
-            date_stamp = datetime.now().strftime("%Y%m%d_%H%M")
-            csv_file = f"{server_name}_{date_stamp}.csv"
-            ps_script_path = os.path.abspath("PerfmonCollector_CSV.ps1")
-
+            # 3️⃣ Komutu hazırla
             command = [
-            "powershell",
-            "-ExecutionPolicy", "Bypass",
-            "-File", ps_script_path,
-            "-duration", str(int(duration_hours))
-                     ]
+                "powershell",
+                "-ExecutionPolicy", "Bypass",
+                "-File", ps_script_path,
+                "-duration", str(self.duration_hours)
+            ]
+
+            # 4️⃣ Başlat
+            self.process = subprocess.Popen(
+                command,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+            self.status_label.setText("Başlatılıyor...")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Hata", f"PowerShell çalıştırılırken hata oluştu:\n{e}")
 
 
-            def run_script():
-                try:
-                    process = subprocess.Popen(command)
-                    threading.Event().wait(duration_hours * 3600)
-                    process.terminate()
-                    QMessageBox.information(self, "Tamamlandı", f"Toplama işlemi tamamlandı:\n{csv_file}")
-                except Exception as e:
-                    QMessageBox.critical(self, "Hata", f"Script çalıştırılırken hata oluştu:\n{str(e)}")
 
-            thread = threading.Thread(target=run_script)
-            thread.start()
+    def get_latest_perfmon_csv_path(self):
+        import socket
+        from datetime import datetime
+        import os
+        import glob
+
+        server_name = socket.gethostname()
+        today = datetime.now().strftime("%Y%m%d")  # Bugünün tarihi
+
+        # .exe veya .py yolu belirle
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+
+        # O gün oluşturulmuş CSV dosyalarını bul
+        pattern = os.path.join(base_path, f"{server_name}_{today}_*.csv")
+        matches = glob.glob(pattern)
+
+        if not matches:
+            QMessageBox.critical(self, "Dosya Bulunamadı", "Bugüne ait CSV dosyası bulunamadı.")
+            return None
+
+        # En son oluşturulanı al
+        latest_csv = max(matches, key=os.path.getctime)
+        return latest_csv
+
+
+
+    def run_script(self, command):
+        try:
+            self.process = subprocess.Popen(command)
+            QTimer.singleShot(0, self.start_gui_update)  # GUI güncellemesini başlat
+        except Exception as e:
+            QTimer.singleShot(0, lambda: self.status_label.setText("❌ Hata"))
+
+
+
+    def update_progress(self):
+        self.elapsed_seconds += 1
+        percent = int((self.elapsed_seconds / self.total_seconds) * 100)
+        self.progress_bar.setValue(min(percent, 100))
+        self.status_label.setText(f"Toplanıyor... %{percent}")
+
+        if self.elapsed_seconds >= self.total_seconds:
+            self.timer.stop()
+            if self.process:
+                self.process.terminate()
+            self.status_label.setText("Tamamlandı")
+
+
+
+
+
+
+    def stop_collection(self):
+        # Timer'ı GUI thread'inde durdur
+        QTimer.singleShot(0, self.timer.stop)
+
+        # PowerShell süreci durdurulacaksa:
+        if self.process and self.process.poll() is None:
+            self.process.send_signal(signal.CTRL_BREAK_EVENT)
+
+        self.status_label.setText("Manuel olarak durduruldu.")
+        QMessageBox.information(self, "Durduruldu", "Veri toplama işlemi manuel olarak sonlandırıldı.")
+
+
 
 
     def get_windows_user(self):
