@@ -388,67 +388,30 @@ class SQLServerConnectionUI(QWidget):
             return
     
     def run_powershell_script(self):
-        try:
-            # 1️⃣ Kullanıcının seçtiği çalışma süresini (saat) al ve bir değişkene ata
-            self.duration_hours = int(self.duration_choice.currentText())
+        duration_hours = int(self.duration_choice.currentText())
+        self.total_seconds = duration_hours * 3600
+        self.elapsed_seconds = 0
+        self.progress_bar.setValue(0)
+        self.status_label.setText("Başlatılıyor...")
 
-            # 2️⃣ .ps1 script path'ini bul (önceki mesajlardaki kodla)
-            if getattr(sys, 'frozen', False):
-                base_path = os.path.dirname(sys.executable)
-            else:
-                base_path = os.path.dirname(os.path.abspath(__file__))
-
-            ps_script_path = os.path.join(base_path, "PerfmonCollector_CSV.ps1")
-            if not os.path.exists(ps_script_path):
-                QMessageBox.critical(self, "Dosya Bulunamadı", f".ps1 dosyası bulunamadı:\n{ps_script_path}")
-                return
-
-            # 3️⃣ Komutu hazırla
-            command = [
-                "powershell",
-                "-ExecutionPolicy", "Bypass",
-                "-File", ps_script_path,
-                "-duration", str(self.duration_hours)
-            ]
-
-            # 4️⃣ Başlat
-            self.process = subprocess.Popen(
-                command,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
-            )
-            self.status_label.setText("Başlatılıyor...")
-
-        except Exception as e:
-            QMessageBox.critical(self, "Hata", f"PowerShell çalıştırılırken hata oluştu:\n{e}")
+        ps_script_path = os.path.abspath("PerfmonCollector_CSV.ps1")
+        command = [
+            "powershell",
+            "-ExecutionPolicy", "Bypass",
+            "-File", ps_script_path,
+            "-duration", str(duration_hours)
+        ]
 
 
+        self.process = subprocess.Popen(
+            command,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+)
+       
 
-    def get_latest_perfmon_csv_path(self):
-        import socket
-        from datetime import datetime
-        import os
-        import glob
+        thread = threading.Thread(target=lambda: self.run_script(command))
+        thread.start()
 
-        server_name = socket.gethostname()
-        today = datetime.now().strftime("%Y%m%d")  # Bugünün tarihi
-
-        # .exe veya .py yolu belirle
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-
-        # O gün oluşturulmuş CSV dosyalarını bul
-        pattern = os.path.join(base_path, f"{server_name}_{today}_*.csv")
-        matches = glob.glob(pattern)
-
-        if not matches:
-            QMessageBox.critical(self, "Dosya Bulunamadı", "Bugüne ait CSV dosyası bulunamadı.")
-            return None
-
-        # En son oluşturulanı al
-        latest_csv = max(matches, key=os.path.getctime)
-        return latest_csv
 
 
 
@@ -1743,9 +1706,8 @@ class SQLServerConnectionUI(QWidget):
             Group the DataFrame into categories for better organization in the PDF report.
             """
             group_mapping = {
-                "SQL Server Configuration": ["MaxMemory", "MinMemory","SQLFiles","TempDB","LogFiles","SQLConfiguration","CompressionBackup","Storage","ServerConfig","SistemDosyalari"],
-                "VM Configuration": ["HighAvailability", "SPCU", "SQLServerVersion", "OSPerformance", "Antivirus",
-                                     "Local Security", "IOPerformance", "AlwaysOn"],
+                "SQL Server Configuration": ["MaxMemory", "MinMemory","SQLFiles","TempDB","LogFiles","SQLConfiguration","CompressionBackup","Storage","AdHoc Query Optimization","SistemDosyalari","HighAvailability", "SPCU", "SQLServerVersion", "OSPerformance", "Antivirus",
+                                     "Local Security", "IOPerformance", "High Availability (HA) / Disaster Recovery"],
                 "Performance": ["Deadlock","JobHistory","PowerShellOutput","VLFCount"],
                 "Security": ["HighPriviligeLogin","EmptyPasswordLogins","SamePasswordLogins","PolicyNotCheckedLogins","ServerLogins","DisableLogins","CPU","ServiceAccount","ServiceAccountPermission","SaAccount","BUILTINAdministratorsGroup","OrphanUser","ServerAuthenticationMode","ComplexPassword","SameSQLUsernameAsPassword","Xpcmdshell"],
                 "Query Performance": ["UpdateStats","ReIndex","LeftoverFakeIndex","ClusteredIndex","MissingIndex","BadIndex","SQLServerBrowserService"],
@@ -1758,7 +1720,7 @@ class SQLServerConnectionUI(QWidget):
                     "AutoShrink",
                     "AutoClose",
                     "RecoveryModel",
-                    "BackupStats"
+                    "Growing Trends"
 
                 ],
             }
@@ -1781,14 +1743,14 @@ class SQLServerConnectionUI(QWidget):
                         item = re.sub(r'^SecHc_', '', item)
 
                         # "Sysadminlogin" özel durum
-                        if item == 'Sysadminlogin':
-                            item = 'HighPriviligeLogin'
+
 
                         # Sonuçları listeye ekle
                         grouped_data.append([group, item, status])
 
             # Convert to DataFrame for easier handling
             grouped_df = pd.DataFrame(grouped_data, columns=["Group", "Description", "Status"])
+            grouped_df = grouped_df.drop_duplicates()
             #print(grouped_df)
 
             return pd.DataFrame(grouped_df)
@@ -2006,23 +1968,23 @@ class SQLServerConnectionUI(QWidget):
             pdf = canvas.Canvas(pdf_path, pagesize=A4)
             width, height = A4
 
-            image_path = self.get_resource_path("dpoint1.png")  # Dosyanın yolu
-            img_width = 50  # Resmin genişliği (isteğe bağlı olarak değiştirilebilir)
-            img_height = 50  # Resmin yüksekliği
-            img_x = width / 2 - img_width   # Ortalamak için sol tarafa kaydır
-            img_y = height - 50  # Resmin konumu
+            #image_path = self.get_resource_path("dpoint1.png")  # Dosyanın yolu
+            #img_width = 50  # Resmin genişliği (isteğe bağlı olarak değiştirilebilir)
+            #img_height = 50  # Resmin yüksekliği
+            #img_x = width / 2 - img_width   # Ortalamak için sol tarafa kaydır
+            #img_y = height - 50  # Resmin konumu
 
-            pdf.drawImage(ImageReader(image_path), img_x, img_y, width=img_width, height=img_height)
-            score_text = f"{100-allScore}"  # Skor yazısı
-            text_x = img_x + img_width + 10  # Resmin sağına hizala
-            text_y = img_y +20  # Resmin ortasında hizala
+            #pdf.drawImage(ImageReader(image_path), img_x, img_y, width=img_width, height=img_height)
+            score_text = f"{100-allScore}"
+            text_x = width / 2 + 30  # img_x yerine sabit bir konum
+            text_y = height - 35     # img_y yerine sabit bir konum
 
-            pdf.setFillColor(HexColor("#1a72b9"))
-            pdf.setFont("Helvetica-Bold", 24)
-            pdf.drawString(text_x, text_y, score_text)
-            progress.setValue(20)  # %20 tamamlandı
-            QApplication.processEvents()
-            time.sleep(0.5)
+            #pdf.setFillColor(HexColor("#1a72b9"))
+            #pdf.setFont("Helvetica-Bold", 24)
+            #pdf.drawString(text_x, text_y, score_text)
+            #progress.setValue(20)  # %20 tamamlandı
+            #QApplication.processEvents()
+            #time.sleep(0.5)
 
             pdf.setTitle("CREATED BY DAPLAIT INFORMATION SYSTEM")
             pdf.setTitle("SQL SERVER HEALTH CHECK")
@@ -2032,58 +1994,76 @@ class SQLServerConnectionUI(QWidget):
             margin_right = 30
 
             # Baslık Arka Planı
-            pdf.setFillColor(HexColor("#003366"))  # Lacivert arka plan
-            pdf.rect(0, height - 90, width, 50, fill=1)
+            pdf.setFillColor(HexColor("#003366"))
+            pdf.rect(0, height - 65, width, 65, fill=1)
 
-            # Baslık Yazısı
-            pdf.setFillColor(HexColor("#FFFFFF"))  # Beyaz yazı rengi
-            pdf.setFont("Helvetica-Bold", 5)  # Daha profesyonel bir yazı tipi
-            pdf.drawCentredString(width / 2, height - 55, "CREATED BY DAPLAIT INFORMATION SYSTEM")
-            pdf.setFont("Helvetica-Bold", 18)  # Daha profesyonel bir yazı tipi
-            pdf.drawCentredString(width / 2, height - 70, "SQL SERVER HEALTH CHECK")
-            # Alt Baslık (Tarih veya Kullanıcı Adı gibi ek bilgiler)
-            pdf.setFont("Helvetica", 12)
+
+            # Beyaz yazılar: Başlıklar yukarıya taşındı
             pdf.setFillColor(HexColor("#FFFFFF"))
-            pdf.drawCentredString(width / 2, height - 85, f"Prepared by: {username} | Date: {rundate}")
+            pdf.setFont("Helvetica-Bold", 5)
+            pdf.drawCentredString(width / 2, height - 20, "CREATED BY DAPLAIT INFORMATION SYSTEM")
+
+            pdf.setFont("Helvetica-Bold", 18)
+            pdf.drawCentredString(width / 2, height - 35, "SQL SERVER HEALTH CHECK")
+
+            pdf.setFont("Helvetica", 12)
+            pdf.drawCentredString(width / 2, height - 50, f"Prepared by: {username} | Date: {rundate}")
+
+
             progress.setValue(30)  # %20 tamamlandı
             QApplication.processEvents()
             time.sleep(0.5)
             excel_data = pd.ExcelFile(excel_path)
             ServerInfo = pd.read_excel(excel_data, sheet_name="ServerInfo")
+            server_row = ServerInfo.iloc[0]
 
+            summary_string = f"{server_row['Sunucu']} - {server_row['Edition']} - {server_row['SQL Version']} - {server_row['Version']}"
+
+            excel_data = pd.ExcelFile(excel_path)
+            ServerInfo = pd.read_excel(excel_data, sheet_name="ServerInfo")
+            server_row = ServerInfo.iloc[0]
+
+            summary_string = f"{server_row['Sunucu']} - {server_row['Edition']} - {server_row['SQL Version']} - {server_row['Version']}"
+
+            # Yeni tablo verisi
             serverinfodata = [
-                ['SERVER', 'EDITION', 'VERSION', 'COLLATION', 'CPU', 'RAM (MB)', 'CLUSTER', 'HA', 'VM SERVER', 'OS',
-                 'Cumulative Update', 'SQL Version']]  # Başlık
-            serverinfodata.extend(ServerInfo.values.tolist())
-            df = pd.DataFrame(serverinfodata[1:], columns=serverinfodata[0])
-            transposed_df = df.transpose()
+                ['SERVER INFO'],  # Başlık
+                [summary_string],
+                ['COLLATION', server_row['Collation']],
+                ['CPU', server_row['CPU']],
+                ['RAM (MB)', server_row['RAM (MB)']],
+                ['CLUSTER', server_row['Cluster']],
+                ['HA', server_row['HA']],
+                ['VM SERVER', server_row['Sanal Server']],
+                ['OS', server_row['OS']],
+                ['Cumulative Update', server_row['Cumulative Update']],
+            ]
 
-            # DataFrame'i table verisine dönüştür
-            transposed_data = [['SERVER INFO']]  # Başlık
-            transposed_data.extend(transposed_df.itertuples(index=True, name=None))
-
-            tableserverinfo = Table(transposed_data, colWidths=[width * 0.15, width * 0.2])
+            # Table oluştur
+            tableserverinfo = Table(serverinfodata, colWidths=[width * 0.25, width * 0.55])
             styleserverinfo = TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), HexColor("#68abe8")),  # Başlık arka planı
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),  # Başlık metin rengi
-                ('FONTNAME', (0, 0), (-1, 0), 'ArialBlack'),  # Başlık fontu
-                ('FONTSIZE', (0, 0), (-1, 0), 8),  # Başlık font boyutu
-                ('FONTSIZE', (0, 1), (-1, -1), 6),  # Gövde font boyutu
-                ('GRID', (0, 0), (-1, -1), 1, colors.white),  # Izgara çizgileri
-                ('TOPPADDING', (0, 0), (-1, -1), 0),  # Üst dolgu
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 0),  # Alt dolgu
-                ('LEFTPADDING', (0, 0), (-1, -1), 1),  # Sol dolgu
-                ('RIGHTPADDING', (0, 0), (-1, -1), 1),  # Sağ dolgu
-                ('ALIGN', (0, 0), (-1, 0), 'LEFT'),  # Sadece başlık satırını merkeze hizala
-                ('ALIGN', (0, 1), (-1, -1), 'LEFT'),  # Tüm hücreler için hizalama
+                ('BACKGROUND', (0, 0), (0, 0), HexColor("#68abe8")), 
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), 'ArialBlack'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('FONTSIZE', (0, 1), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 1, colors.white),
+                ('TOPPADDING', (0, 0), (-1, -1), 1),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+                ('LEFTPADDING', (0, 0), (-1, -1), 1),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 1),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ])
 
-            x_position = 30  # 200, göstergenin genisligi
+            x_position = 30
             y_position = height - 260
             tableserverinfo.setStyle(styleserverinfo)
-            tableserverinfo.wrapOn(pdf, width - 60, height - 25)  # Sağdan ve soldan boşluk bırakarak wrap
+            tableserverinfo.wrapOn(pdf, width - 60, height - 25)
             tableserverinfo.drawOn(pdf, x_position, y_position)
-            progress.setValue(40)  # %20 tamamlandı
+
+            progress.setValue(40)
+
+
             QApplication.processEvents()
             if not summary_df.empty:
                 count_true = 100-allScore
@@ -2156,55 +2136,94 @@ class SQLServerConnectionUI(QWidget):
             x_position = 80
             images_per_row = 3
             image_count = 0
+            # Hedef kategoriler
+            final_categories = [
+                "SQL SERVER CONFIG",
+                "DATABASE CONFIG",
+                "SECURITY",
+                "PERFORMANCE",
+                "QUERY PERFORMANCE"
+            ]
 
-            for category, metrics in summary.items():
-                # Add gauge chart
+            # summary içinden bu kategorileri derleyelim
+            summary_merged = {}
+
+            # SQL SERVER CONFIG = birleşim
+            config_groups = ["SQL Server Configuration", "VM Configuration"]
+            merged_config = {"Successful": 0, "Failed": 0, "Warning": 0}
+            for group in config_groups:
+                if group in summary:
+                    for key in merged_config:
+                        merged_config[key] += summary[group].get(key, 0)
+            summary_merged["SQL SERVER CONFIG"] = merged_config
+
+            # Diğerleri doğrudan eşleşerek aktarılır
+            for group in final_categories[1:]:
+                for key in summary:
+                    if key.strip().lower() == group.strip().lower():
+                        summary_merged[group] = summary[key]
+                        break
+
+            x_position = 80
+            images_per_row = 3
+            image_count = 0
+            y_position = y_position - 50  # ilk tabloya biraz boşluk bırak
+
+            x_start = 80
+            y_start = height - 400
+            row_spacing = 250
+            col_spacing = 180
+
+            # 5 sabit kategori
+            chart_positions = [
+                (x_start, y_start),
+                (x_start + col_spacing, y_start),
+                (x_start + 2 * col_spacing, y_start),
+                (x_start, y_start - row_spacing),
+                (x_start + col_spacing, y_start - row_spacing),
+            ]
+
+            for i, category in enumerate(final_categories):
+                if category not in summary_merged:
+                    continue
+
+                x_pos, y_pos = chart_positions[i]
+                metrics = summary_merged[category]
 
                 gauge_path = f"{output_dir}/{category}_gauge.png"
-                self.create_gauge_chart(round((metrics["Successful"] + (metrics["Warning"]*0.4)) /(metrics["Warning"] + metrics["Successful"] + metrics["Failed"] ) * 100, 1), category,
-                                        gauge_path)
+                percent = round((metrics["Successful"] + (metrics["Warning"] * 0.4)) /
+                                (metrics["Warning"] + metrics["Successful"] + metrics["Failed"]) * 100, 1)
 
-                # Görseli PDF'e yerlestir
-                pdf.drawImage(gauge_path, x_position, y_position - 150, width=150, height=100)
-                # Verileri düzenleme
-                data = [
+                self.create_gauge_chart(percent, category, gauge_path)
 
-                    ["Success", "Failed", "Warning"],  # İkinci satır başlıklar
-                    [metrics["Successful"], metrics["Failed"], metrics["Warning"]],  # Üçüncü satır veriler
-                ]
-                # Sütun genişliklerini ayarla (başlık satırı için tek genişlik)
-                # Tabloyu oluştur
-                table = Table(data, colWidths=[50, 50, 50])
-                table.setStyle(
-                    TableStyle(
-                        [
-                            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1f3242")),
-                            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                            ("FONTNAME", (0, 0), (-1, 0), "ArialBlack"),
-                            ("FONTSIZE", (0, 0), (-1, -1), 10),
-                            ("GRID", (0, 0), (-1, -1), 1, colors.black),
-                        ]
-                    )
-                )
+                # 1️⃣ Gauge çizimi
+                pdf.drawImage(gauge_path, x_pos, y_pos, width=120, height=80)
 
+                # 2️⃣ Açıklama yazısı (kategori adı + %)
+                pdf.setFont("Helvetica-Bold", 9)
+                pdf.setFillColor(colors.black)
+                pdf.drawCentredString(x_pos + 60, y_pos - 10, category)
+                pdf.setFont("Helvetica", 9)
+                pdf.drawCentredString(x_pos + 60, y_pos - 25, f"{percent:.2f}%")
+
+                # 3️⃣ Tablo
+                data = [["Success", "Failed", "Warning"],
+                        [metrics["Successful"], metrics["Failed"], metrics["Warning"]]]
+                table = Table(data, colWidths=[40, 40, 40])
+                table.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1f3242")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "ArialBlack"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ]))
                 table.wrapOn(pdf, width, height)
-                table.drawOn(pdf, x_position, y_position - 200)  # Görselin altına tabloyu yerlestir
+                table.drawOn(pdf, x_pos, y_pos - 70)
+            pdf.showPage()
+            y_position = height - 100
 
-                # X pozisyonunu kaydır ve sayaç artır
-                x_position += 160  # Görseller ve tablolar arası yatay bosluk için
-                image_count += 1
 
-                # Görseller ve tablolar satırı dolunca bir alt satıra geç
-                if image_count % images_per_row == 0:
-                    x_position = 80  # Sola sıfırla
-                    y_position -= 250  # Bir satır asagı in (görsel + tablo yüksekligi)
-
-                # Sayfa sonuna ulasırsa yeni sayfa aç ve bastan basla
-                if y_position < 150:
-                    pdf.showPage()
-                    x_position = 80
-                    y_position = height - 100
 
             progress.setValue(80)  # %20 tamamlandı
             QApplication.processEvents()
@@ -2225,30 +2244,72 @@ class SQLServerConnectionUI(QWidget):
             data2 = grouped_df.iterrows()
 
             # Başlıkları ekleyin (ilk satır)
-            data2 = [["Group", "Description", "Current Status"]]
+            page_groups = [
+                ["SQL Server Configuration", "Database Config"],
+                ["Security"],
+                ["Performance", "Query Performance"]
+            ]
 
-            last_group = None  # Tekrarlayan 'Group' değerlerini kontrol etmek için
-            first_group_seen = False
-            # Birleştirilmiş DataFrame'i döngü ile işleyin
-            for _, row in grouped_df.iterrows():
-                # 'Group' sütununda tekrar eden değerleri boş bırak
-                group_value = row["Group"] if row["Group"] != last_group else ""
-                # Satırdaki değerleri alın ve data2'ye ekleyin
-                if row["Group"] != "SQL Server Configuration":
-                    description_value = row["Description"] #blurlanacak yer
-                else:
+            for page_group in page_groups:
+                page_df = grouped_df[grouped_df["Group"].isin(page_group)]
+
+                data2 = [["Group", "Description", "Current Status"]]
+                last_group = None
+                first_group_seen = False
+
+                for _, row in page_df.iterrows():
+                    group_value = row["Group"] if row["Group"] != last_group else ""
                     description_value = row["Description"]
-                row_data = [group_value, description_value, row["Status"]] + row[3:].tolist()
-                data2.append(row_data)
-                last_group = row["Group"]  # Son görülen grubu güncelle
+                    row_data = [group_value, description_value, row["Status"]]
+                    data2.append(row_data)
+                    last_group = row["Group"]
 
-            margin_left = 30
-            table_width = width - (2 * margin_left)
-            col_count = len(data2[0])
-            col_width = table_width / col_count
-            progress.setValue(95)  # %20 tamamlandı
-            QApplication.processEvents()
-            table2 = Table(data2, colWidths=[col_width] * col_count)
+                col_count = len(data2[0])
+                col_width = (width - 60) / col_count
+                table2 = Table(data2, colWidths=[col_width] * col_count)
+
+                # Stil tanımı (kopyala)
+                table_styles = [
+                    ('BACKGROUND', (0, 0), (-1, 0), HexColor("#68abe8")),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'ArialBlack'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.white),
+                ]
+
+                for idx, row in enumerate(data2[1:], start=1):
+                    for col_idx, value in enumerate(row[2:], start=2):
+                        if value == "Successful":
+                            table_styles.append(('BACKGROUND', (col_idx, idx), (col_idx, idx), HexColor("#52bf58")))
+                            table_styles.append(('TEXTCOLOR', (col_idx, idx), (col_idx, idx), colors.whitesmoke))
+                        elif value == "Failed":
+                            table_styles.append(('BACKGROUND', (col_idx, idx), (col_idx, idx), HexColor("#ed283c")))
+                            table_styles.append(('TEXTCOLOR', (col_idx, idx), (col_idx, idx), colors.whitesmoke))
+                        elif value == "Warning":
+                            table_styles.append(('BACKGROUND', (col_idx, idx), (col_idx, idx), HexColor("#FFA500")))
+                            table_styles.append(('TEXTCOLOR', (col_idx, idx), (col_idx, idx), colors.whitesmoke))
+
+                table2.setStyle(TableStyle(table_styles))
+
+                # Sayfa başlığı çiz
+                y_position = height - 100
+                pdf.setFillColor(HexColor("#9bb5e8"))
+                pdf.rect(0, y_position , width, 30, fill=1 , stroke=0)
+                pdf.setFillColor(HexColor("#FFFFFF"))
+                pdf.setFont("Helvetica-Bold", 12)
+                pdf.drawCentredString(width / 2, y_position+12 , "HEALTH CHECK RESULT")
+                y_position -= 50
+
+                # Tabloyu çizdir
+                table2.wrapOn(pdf, width, height)
+                table2.drawOn(pdf, 30, y_position - len(data2)*15)
+
+                # Her grup listesi için yeni sayfa
+                pdf.showPage()
+
+
             # Base styles
             table_styles = [
                 ('BACKGROUND', (0, 0), (-1, 0), HexColor("#68abe8")),  # Header background
@@ -2294,21 +2355,21 @@ class SQLServerConnectionUI(QWidget):
             available_space2 = y_position -50
             table_splits2 = table2.split(table_max_width, available_space2)
 
-            for split_table in table_splits2:
-                split_width, split_height = split_table.wrap(table_max_width, y_position)
-                if y_position - split_height < 50:  # If space is insufficient, add a new page
-                    pdf.showPage()
-                    y_position = height - 50
-                split_table.drawOn(pdf, margin_left, y_position - split_height)
-                y_position -= split_height + 20
-            image_path = self.get_resource_path("blur.png")  # Görselin yolu
-            img_width = 180  # Görselin genişliği
-            img_height = 508  # Görselin yüksekliği
-            img_x = (width - img_width) / 2  # Görseli ortalamak için
-            img_y = img_height - 402  # Görseli tablo altında 50 birim boşlukla çiz
-            progress.setValue(100)  # %20 tamamlandı
-            QApplication.processEvents()
-            #pdf.drawImage(image_path, img_x, img_y, width=img_width, height=img_height)
+            # for split_table in table_splits2:
+            #     split_width, split_height = split_table.wrap(table_max_width, y_position)
+            #     if y_position - split_height < 50:  # If space is insufficient, add a new page
+            #         pdf.showPage()
+            #         y_position = height - 50
+            #     split_table.drawOn(pdf, margin_left, y_position - split_height)
+            #     y_position -= split_height + 20
+            # image_path = self.get_resource_path("blur.png")  # Görselin yolu
+            # img_width = 180  # Görselin genişliği
+            # img_height = 508  # Görselin yüksekliği
+            # img_x = (width - img_width) / 2  # Görseli ortalamak için
+            # img_y = img_height - 402  # Görseli tablo altında 50 birim boşlukla çiz
+            # progress.setValue(100)  # %20 tamamlandı
+            # QApplication.processEvents()
+            # pdf.drawImage(image_path, img_x, img_y, width=img_width, height=img_height)
 
             # PDF'yi kaydet
             pdf.save()
