@@ -1,0 +1,23 @@
+# Çıkartılacak klasörler
+CsvFile/
+csv/
+dist/
+report/
+build/
+reports/
+performancemetric/
+performansmetric/
+
+# Python cache dosyaları
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node.js
+node_modules/
+
+# Sanal ortam
+.env
+.venv/
+venv/

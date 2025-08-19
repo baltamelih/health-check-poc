@@ -1,0 +1,70 @@
+--int olması gerekilen kolon varchar yada nvarchar olarak açılmış ise tespit eder
+--Eray Güneş   / LastUpdatedDate :  10.06.2022
+
+IF OBJECT_ID('tempdb.dbo.#VeriTespitiCharToINT', 'U') IS NOT NULL DROP TABLE #VeriTespitiCharToINT;
+CREATE TABLE #VeriTespitiCharToINT
+(
+TableName nvarchar(100)
+,ColumnName nvarchar(100)
+,Veritipi nvarchar(100)
+,OlmasiGerekenVeriTipi nvarchar(100)
+,UsedMaxSize int
+)
+
+
+DECLARE @TABLE_NAME     nvarchar(256)
+DECLARE @ColumnName     nvarchar(100)
+DECLARE @MaxSize     nvarchar(100)
+declare @Veritipi nvarchar(100)
+declare @TABLE_SCHEMA nvarchar(30)
+
+DECLARE VerileriHazirla CURSOR FAST_FORWARD FOR
+
+select TABLE_NAME,COLUMN_NAME
+,DATA_TYPE= REPLACE(DATA_TYPE+'('+CAST(  CHARACTER_MAXIMUM_LENGTH  AS nvarchar(6))+')','-1','max')
+,TABLE_SCHEMA
+from INFORMATION_SCHEMA.COLUMNS col
+INNER JOIN sys.objects as obj ON obj.name = col.TABLE_NAME
+WHERE DATA_TYPE in ('nvarchar','varchar')  and type_desc='USER_TABLE'  and name not like '%Log%'
+order by 1,2
+
+
+OPEN VerileriHazirla
+FETCH NEXT FROM VerileriHazirla INTO @TABLE_NAME , @ColumnName,@Veritipi,@TABLE_SCHEMA
+WHILE @@FETCH_STATUS = 0
+BEGIN
+
+begin try
+BEGIN TRANSACTION Veritipibul
+
+
+	DECLARE @SQL NVARCHAR(MAX)= N'select tablo=''TABLE_NAME'',Colomn=''ColumnName'',VeriTipi=''GuncelVeriTipi'',OlmasiGerekenVeriTipi=''INT''
+	,UsedMaxSize=max(cast([ColumnName] as int))
+	from [SCHEMA].[TABLE_NAME] with(nolock)     '
+	SET @SQL = REPLACE(@SQL,N'ColumnName',@ColumnName)
+	SET @SQL = REPLACE(@SQL,N'TABLE_NAME',@TABLE_NAME)
+	SET @SQL = REPLACE(@SQL,N'GuncelVeriTipi',@Veritipi)
+	SET @SQL = REPLACE(@SQL,N'SCHEMA',@TABLE_SCHEMA)
+
+
+	insert into #VeriTespitiCharToINT (TableName,ColumnName,Veritipi,OlmasiGerekenVeriTipi,UsedMaxSize)
+	EXEC(@SQL)
+
+commit transaction Veritipibul
+
+end try
+begin catch
+rollback tran Veritipibul
+end catch
+
+	FETCH NEXT FROM VerileriHazirla INTO @TABLE_NAME , @ColumnName,@Veritipi,@TABLE_SCHEMA
+END
+CLOSE VerileriHazirla
+DEALLOCATE VerileriHazirla
+
+
+
+
+delete from #VeriTespitiCharToINT  where  UsedMaxSize is  null
+
+SELECT * FROM #VeriTespitiCharToINT
