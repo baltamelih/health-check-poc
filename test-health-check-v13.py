@@ -1,18 +1,20 @@
 from dp_script import SECURITY_SCRIPT_BASE64  # İlk script
-from vlf_count import SECURITY_SCRIPT54_BASE64
+from vlfcount import SECURITY_SCRIPT54_BASE64
 from dp_script2 import SECURITY_SCRIPT2_BASE64 #Hcv999
-from backup_status_check import SECURITY_SCRIPT5_BASE64
-from policy_login_check import SECURITY_SCRIPT6_BASE64
-from credential_reuse_check import  SECURITY_SCRIPT7_BASE64
-from schema_cleanup import SECURITY_SCRIPT8_BASE64
+from hcscript import SECURITY_SCRIPT4_BASE64# İkinci script
+from backuplogrunning import SECURITY_SCRIPT5_BASE64
+from policynotcheckedlogin import SECURITY_SCRIPT6_BASE64
+from samepasswordlogins import  SECURITY_SCRIPT7_BASE64
+from full_script import SECURITY_SCRIPT9_BASE64
+from drop import SECURITY_SCRIPT8_BASE64
 from dp_script3 import SECURITY_SCRIPT10_BASE64
-from sql_execute_extended import SECURITY_SCRIPT11_BASE64
-from job_history_report import SECURITY_SCRIPT14_BASE64
-from service_account_permissions import SECURITY_SCRIPT15_BASE64
-from builtin_accounts_audit import SECURITY_SCRIPT16_BASE64
+from xpcmdshell import SECURITY_SCRIPT11_BASE64
+from jobhistory2 import SECURITY_SCRIPT14_BASE64
+from serviceaccountpermission import SECURITY_SCRIPT15_BASE64
+from builtin import SECURITY_SCRIPT16_BASE64
 from server_auth import SECURITY_SCRIPT17_BASE64
-from expensive_queries_report import SECURITY_SCRIPT18_BASE64
-from wait_type_summary import SECURITY_SCRIPT19_BASE64
+from expensivequery import SECURITY_SCRIPT18_BASE64
+from waittype import SECURITY_SCRIPT19_BASE64
 import threading
 import subprocess
 import signal
@@ -448,125 +450,6 @@ class ConsentWindow(QWidget):
         self.main_app = SQLServerConnectionUI()
         self.main_app.show()
 
-class PerformanceMetricsWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Performance Metrics Collection")
-        self.setFixedSize(450, 360)
-        self.setStyleSheet("font-family: Segoe UI; font-size: 13px;")
-
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_progress)
-        self.process = None
-
-        self.build_ui()
-
-    def build_ui(self):
-        layout = QVBoxLayout()
-        grid = QGridLayout()
-        grid.setSpacing(12)
-
-        # Start Time
-        grid.addWidget(QLabel("Start Time:"), 0, 0)
-        self.start_time = QDateTimeEdit(QDateTime.currentDateTime())
-        self.start_time.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
-        grid.addWidget(self.start_time, 0, 1)
-
-        # Duration (in hours)
-        grid.addWidget(QLabel("Duration (hours):"), 1, 0)
-        self.duration_choice = QComboBox()
-        self.duration_choice.addItems(["1", "3", "6", "12", "24"])
-        self.duration_choice.setCurrentText("24")
-        grid.addWidget(self.duration_choice, 1, 1)
-
-        # Progress Bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setValue(0)
-        grid.addWidget(self.progress_bar, 2, 0, 1, 2)
-
-        # Status Label
-        self.status_label = QLabel("Ready")
-        grid.addWidget(self.status_label, 3, 0, 1, 2)
-
-        # Start Button
-        self.ps_button = QPushButton("Start Collection")
-        self.ps_button.clicked.connect(self.run_powershell_script)
-        grid.addWidget(self.ps_button, 4, 0, 1, 2)
-
-        # Stop Button
-        self.stop_button = QPushButton("Stop")
-        self.stop_button.clicked.connect(self.stop_collection)
-        grid.addWidget(self.stop_button, 5, 0, 1, 2)
-
-        layout.addLayout(grid)
-        self.setLayout(layout)
-
-    def run_powershell_script(self):
-        duration_hours = int(self.duration_choice.currentText())
-        self.total_seconds = duration_hours * 3600
-        self.elapsed_seconds = 0
-        self.progress_bar.setValue(0)
-        self.status_label.setText("Starting...")
-
-        script_name = "PerfmonCollector_CSV.ps1"
-        script_path = os.path.abspath(script_name)
-
-        # Çıkış klasörü ve dosya yolu
-        output_folder = os.path.join(os.getcwd(), "performansmetric")
-        os.makedirs(output_folder, exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = os.path.join(output_folder, f"metrics_{timestamp}.csv")
-
-        # Start time formatı
-        start_time = self.start_time.dateTime().toString("yyyy-MM-dd HH:mm:ss")
-
-        command = [
-            "powershell",
-            "-ExecutionPolicy", "Bypass",
-            "-File", f'"{script_path}"',
-            "-startTime", f'"{start_time}"',
-            "-duration", str(duration_hours),
-            "-outputPath", f'"{output_file}"'
-        ]
-
-        self.process = subprocess.Popen(
-            " ".join(command),
-            shell=True,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
-        )
-
-        self.timer.start(1000)
-        self.status_label.setText("Collecting...")
-
-    def update_progress(self):
-        self.elapsed_seconds += 1
-        percent = int((self.elapsed_seconds / self.total_seconds) * 100)
-        self.progress_bar.setValue(min(percent, 100))
-        self.status_label.setText(f"Collecting... {percent}%")
-
-        if self.elapsed_seconds >= self.total_seconds:
-            self.timer.stop()
-            if self.process:
-                self.process.terminate()
-            self.status_label.setText("Completed ✅")
-            QMessageBox.information(self, "Completed", "Performance metrics collection completed.")
-
-    def stop_collection(self):
-        self.timer.stop()
-
-        # Create stop_signal.txt
-        stop_file = os.path.join(os.getcwd(), "stop_signal.txt")
-        with open(stop_file, "w") as f:
-            f.write("stop")
-
-        if self.process and self.process.poll() is None:
-            self.process.send_signal(signal.CTRL_BREAK_EVENT)
-
-        self.status_label.setText("Stopped manually.")
-        QMessageBox.information(self, "Stopped", "Data collection has been stopped manually.")
-
-
 
 
 class CheckListWindow(QWidget):
@@ -864,8 +747,8 @@ class SQLServerConnectionUI(QWidget):
         # Bu fonksiyonlar initUI()'den once gelmeli
         self.current_user = self.get_windows_user()
         self.connection = None
-        #self.key = self.load_or_generate_key()
-        #self.fernet = Fernet(self.key)
+        self.key = self.load_or_generate_key()
+        self.fernet = Fernet(self.key)
         self.checklist_window = None
         self.is_dark_mode = False
         self.initUI()  # UI en sona alınmalıydı
@@ -877,15 +760,30 @@ class SQLServerConnectionUI(QWidget):
             error_message += f"Stack Trace:\n{traceback.format_exc()}\n"
 
             # Log dosyasına yaz
-            with open("error_log.txt", "a", encoding="utf-8") as file:
+            with open("txt/error_log.txt", "a", encoding="utf-8") as file:
                 file.write(error_message + "\n")
 
         except Exception as log_error_exception:
             print(f"Log writing error: {log_error_exception}")
 
     def load_or_generate_key(self):
-        return 0
-
+        """sifreleme anahtarını olusturur veya mevcut olanı yükler."""
+        try:
+            key_file = "credentials_folder/secret.key"
+            if not os.path.exists("credentials_folder"):
+                os.makedirs("credentials_folder")
+            if not os.path.exists(key_file):
+                key = Fernet.generate_key()
+                with open(key_file, "wb") as file:
+                    file.write(key)
+            else:
+                with open(key_file, "rb") as file:
+                    key = file.read()
+            return key
+        except Exception as e:
+            self.log_error(e, 'load_or_generate_key')
+            QMessageBox.critical(self, "Error", f"An error occurred while loading the key file:\n{e}")
+            return None
 
     def encrypt_data(self, data):
         """Veriyi sifreler."""
@@ -1188,10 +1086,29 @@ class SQLServerConnectionUI(QWidget):
 
     def load_saved_credentials(self):
         """Kaydedilmis bilgileri yükler ve çözer."""
-        return 0
+        try:
+            if os.path.exists("credentials_folder/credentials.json"):
+                with open("credentials_folder/credentials.json", "r") as file:
+                    data = json.load(file)
+                    self.server_name.setText(data.get("server_name", ""))
+                    if "login" in data and "password" in data:
+                        self.login.setText(data.get("login", ""))
+                        self.password.setText(data.get("password", ""))
+        except Exception as e:
+            self.log_error(e, "load_saved_credentials")
+            QMessageBox.critical(self, "Warning", f"An error occurred while loading the saved information:\n{e}")
+            return
 
     def save_to_file(self, data):
-        return 0
+        try:
+            """Bilgileri düz metin olarak dosyaya kaydeder."""
+            os.makedirs("credentials_folder", exist_ok=True)
+            with open("credentials_folder/credentials.json", "w") as file:
+                json.dump(data, file)
+        except Exception as e:
+            self.log_error(e, "save_to_file")
+            QMessageBox.critical(self, "Warning", f"An error occurred while loading the saved information:\n{e}")
+            return
 
 
     def test_connection(self):

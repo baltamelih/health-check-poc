@@ -1,0 +1,16 @@
+# version_info.txt
+VSVersionInfo(
+  ffi=FixedFileInfo(filevers=(1,4,0,0), prodvers=(1,4,0,0), flags=0, OS=0x40004, fileType=0x1, subtype=0),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+      StringStruct('CompanyName', 'Data Platform'),
+      StringStruct('FileDescription', 'Data Platform Health Check'),
+      StringStruct('InternalName', 'dp-health-check'),
+      StringStruct('OriginalFilename', 'dp-health-check.exe'),
+      StringStruct('ProductName', 'DP Health Check'),
+      StringStruct('ProductVersion', '1.4.0'),
+      StringStruct('LegalCopyright', '(c) 2025 Data Platform')
+    ])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
