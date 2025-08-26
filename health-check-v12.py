@@ -1134,7 +1134,7 @@ class SQLServerConnectionUI(QWidget):
             username = getpass.getuser()
             domain = os.environ.get('USERDOMAIN', '')
             if domain:
-                return f"{domain}\{username}"
+                return f"{domain}\\{username}"
             return username
         except Exception as e:
             self.log_error(e, "get_windows_user")
@@ -1534,6 +1534,8 @@ class SQLServerConnectionUI(QWidget):
                                 "control_column_name": "ReIndex",
                                 "status": status
                             })
+                        else:
+                            rows.append({"control_column_name": "ReIndex", "status" : 1 }) # 0/1/2
                     except Exception as e:
                         self.log_error(e, "ReIndex")
 
@@ -2030,6 +2032,8 @@ class SQLServerConnectionUI(QWidget):
                                 warning_dbs.append(row)
                             else:
                                 sheet_df.at[index, 'Status'] = 'SUCCESS'
+                                tag = 'Success'  # 1/2
+
                         # Durumu rows listesine ekle
                         status = 0 if tag == 'Failed' else (2 if tag == 'Warning' else 1)
                         rows.append({"control_column_name": "CompatibilityLevel", "status": status})

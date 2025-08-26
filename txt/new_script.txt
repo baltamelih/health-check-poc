@@ -156,21 +156,19 @@ WHERE OBJECTPROPERTY(s.[object_id],'IsUserTable') = 1
     AND user_updates > (user_seeks + user_scans + user_lookups)
     AND i.index_id > 1;
 
-
 -- Geçici tabloyu oluştur
 IF OBJECT_ID('tempdb..#ReIndex') IS NOT NULL
     DROP TABLE #ReIndex;
-
 CREATE TABLE #ReIndex (
     TableName NVARCHAR(255),
     IndexName NVARCHAR(255),
     IndexID INT,
     AvgFragmentationPercent FLOAT,
-    ReIndexCommand NVARCHAR(MAX)
+    ReIndexCommand NVARCHAR(MAX),
+   PageCount NVARCHAR(255),
 );
-
 -- Sorgunun sonuçlarını geçici tabloya ekle
-INSERT INTO #ReIndex (TableName, IndexName, IndexID, AvgFragmentationPercent, ReIndexCommand)
+INSERT INTO #ReIndex (TableName, IndexName, IndexID, AvgFragmentationPercent, ReIndexCommand, PageCount)
 SELECT
     OBJECT_NAME(ps.object_id) AS TableName,
     i.name AS IndexName,
@@ -183,12 +181,15 @@ SELECT
             'ALTER INDEX ' + QUOTENAME(i.name) + ' ON ' + QUOTENAME(OBJECT_NAME(ps.object_id)) + ' REORGANIZE;'
         ELSE
             'Index fragmentation is low. No action needed.'
-    END AS ReIndexCommand
+    END AS ReIndexCommand,
+   ps.page_count AS PageCount
 FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') AS ps
 INNER JOIN sys.indexes AS i
     ON ps.object_id = i.object_id
     AND ps.index_id = i.index_id
+WHERE ps.database_id = DB_ID()AND ps.page_count > 1000
 ORDER BY ps.avg_fragmentation_in_percent DESC;
+
 
 
 IF OBJECT_ID('tempdb..#LeftoverFakeIndex') IS NOT NULL
@@ -243,27 +244,35 @@ SELECT
 FROM hi;
 
 
-
--- Geçici tabloyu oluştur
+-- Temp tabloyu oluştur
 IF OBJECT_ID('tempdb..#UpdateStats') IS NOT NULL
     DROP TABLE #UpdateStats;
-
 CREATE TABLE #UpdateStats (
     TableName NVARCHAR(255),
+    IndexName NVARCHAR(255),
     LastStatsUpdateTime DATETIME,
+    TotalPages BIGINT,
     UpdateStatsCommand NVARCHAR(MAX)
 );
-
--- Sorgunun sonuçlarını geçici tabloya ekle
-INSERT INTO #UpdateStats (TableName, LastStatsUpdateTime, UpdateStatsCommand)
+-- Verileri ekle
+INSERT INTO #UpdateStats (TableName, IndexName, LastStatsUpdateTime, TotalPages, UpdateStatsCommand)
 SELECT
-    OBJECT_NAME(s.object_id) AS TableName,
+    t.name AS TableName,
+    s.name AS IndexName,
     sp.last_updated AS LastStatsUpdateTime,
-    'UPDATE STATISTICS ' + QUOTENAME(OBJECT_NAME(s.object_id)) + ' WITH FULLSCAN;' AS UpdateStatsCommand
+    ISNULL(ps.total_pages, 0) AS TotalPages,
+    'UPDATE STATISTICS ' + QUOTENAME(SCHEMA_NAME(t.schema_id)) + '.' + QUOTENAME(t.name) + ' ' + QUOTENAME(s.name) + ' WITH FULLSCAN;' AS UpdateStatsCommand
 FROM sys.stats AS s
+INNER JOIN sys.tables AS t ON s.object_id = t.object_id
 CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) AS sp
-WHERE OBJECTPROPERTY(s.object_id, 'IsUserTable') = 1
-ORDER BY sp.last_updated DESC;
+OUTER APPLY (
+    SELECT SUM(used_page_count) AS total_pages
+    FROM sys.dm_db_partition_stats
+    WHERE object_id = t.object_id AND index_id = s.stats_id
+) AS ps
+WHERE OBJECTPROPERTY(t.object_id, 'IsUserTable') = 1
+ORDER BY sp.last_updated;
+ 
 -- Geçici tabloyu oluştur
 IF OBJECT_ID('tempdb..#MissingIndexCount') IS NOT NULL
     DROP TABLE #MissingIndexCount;
