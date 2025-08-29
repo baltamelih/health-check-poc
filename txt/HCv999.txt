@@ -157,6 +157,11 @@ BEGIN
 END
 -------------------------------------------serverinfo---------------------------------------------------
 
+IF OBJECT_ID('tempdb..#ServerInfo') IS NOT NULL
+BEGIN
+    DROP TABLE #ServerInfo;
+END
+
 CREATE TABLE #ServerInfo (
     Sunucu NVARCHAR(255),
     Edition NVARCHAR(255),
@@ -188,16 +193,16 @@ BEGIN
         CONVERT(NVARCHAR(50), SERVERPROPERTY('IsClustered')) AS [Cluster],
         CONVERT(NVARCHAR(50), SERVERPROPERTY('IsHadrEnabled')) AS [HA],
         CASE
-            WHEN EXISTS (SELECT 1 FROM sys.dm_os_sys_info WHERE virtual_machine_type_desc = 'NONE') THEN 'Hayir'
-            ELSE 'Evet'
+            WHEN EXISTS (SELECT 1 FROM sys.dm_os_sys_info WHERE virtual_machine_type_desc = 'NONE') THEN 'No'
+            ELSE 'Yes'
         END AS [Sanal Server],
         (SELECT TOP 1 host_platform FROM sys.dm_os_host_info) AS [OS],
-        CASE
-            WHEN @@VERSION LIKE '%CU%' THEN
-                'CU' + SUBSTRING(@@VERSION, CHARINDEX('CU', @@VERSION) + 2, CHARINDEX(' ', @@VERSION, CHARINDEX('CU', @@VERSION)) - CHARINDEX('CU', @@VERSION) - 2)
-            ELSE 'RTM'
-        END AS [Cumulative Update],
-        CASE
+         CASE
+         WHEN COALESCE(CONVERT(varchar(30), SERVERPROPERTY('ProductUpdateLevel')), '') <> ''
+              THEN CONVERT(varchar(30), SERVERPROPERTY('ProductUpdateLevel')) 
+         ELSE 'RTM'
+       END AS [Cumulative Update],
+         CASE
             WHEN @Version = 16 THEN 'SQL Server 2022'
             WHEN @Version = 15 THEN 'SQL Server 2019'
             WHEN @Version = 14 THEN 'SQL Server 2017'
@@ -220,11 +225,11 @@ BEGIN
         physical_memory_kb / 1024 AS [RAM (MB)],
         CONVERT(NVARCHAR(50), SERVERPROPERTY('IsClustered')) AS [Cluster],
         CONVERT(NVARCHAR(50), SERVERPROPERTY('IsHadrEnabled')) AS [HA],
-        'Bilinmiyor' AS [Sanal Server],
-        'Bilinmiyor' AS [OS],
+        'Unknown' AS [Sanal Server],
+        'Unknown' AS [OS],
         CASE
             WHEN @@VERSION LIKE '%CU%' THEN
-                'CU' + SUBSTRING(@@VERSION, CHARINDEX('CU', @@VERSION) + 2, CHARINDEX(' ', @@VERSION, CHARINDEX('CU', @@VERSION)) - CHARINDEX('CU', @@VERSION) - 2)
+                'CU' + SUBSTRING(@@VERSION, CHARINDEX('CU', @@VERSION) + 2, CHARINDEX(')', @@VERSION, CHARINDEX('CU', @@VERSION)) - CHARINDEX('CU', @@VERSION) - 2)
             ELSE 'RTM'
         END AS [Cumulative Update],
         CASE
@@ -240,7 +245,6 @@ BEGIN
 
 
 END;
-
 
 
 -------------------------------------configuration------------------------------------------

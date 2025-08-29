@@ -2022,20 +2022,26 @@ class SQLServerConnectionUI(QWidget):
                         # FAILED ve WARNING durumlarını belirle
                         failed_dbs = []
                         warning_dbs = []
+                        success_dbs = []
                         for index, row in sheet_df.iterrows():
                             diff = abs(row['DB Compatibility Level'] - reference_level)
                             if diff > 20:
-                                tag = 'Failed'
                                 failed_dbs.append(row)
                             elif 10 <= diff <= 20:
-                                tag = 'Warning'
                                 warning_dbs.append(row)
                             else:
-                                sheet_df.at[index, 'Status'] = 'SUCCESS'
-                                tag = 'Success'  # 1/2
+                                success_dbs.append(row)
+
+                        if failed_dbs:   # liste boş değilse True
+                            tag = 'Failed'
+                        elif warning_dbs:
+                            tag = 'Warning'
+                        else:
+                            tag = 'Success'
 
                         # Durumu rows listesine ekle
                         status = 0 if tag == 'Failed' else (2 if tag == 'Warning' else 1)
+
                         rows.append({"control_column_name": "CompatibilityLevel", "status": status})
                     except Exception as e:
                         self.log_error(e, "CompatibilityLevel")
@@ -2380,31 +2386,49 @@ class SQLServerConnectionUI(QWidget):
                 elif sheet_name == "CPUInfo":
                     # E134
                     try:
-                        # CPU bilgilerini al
-                        logical_cpu = sheet_df["Logical CPU"].iloc[0]
-                        physical_cpu = sheet_df["Physical CPU"].iloc[0]
-                        socket_count = sheet_df["Socket Count"].iloc[0]
-                        # Core/Socket oranını hesapla
-                        core_socket_rate = logical_cpu / socket_count
-                        core_socket_special = [[2, 16], [2, 8], [2, 32], [1, 4], [2, 24], [2, 12], [2, 24], [1, 8],
-                                               [2, 8], [4, 16]]
-                        if [socket_count, logical_cpu] in core_socket_special:
-                            rows.append({
-                                "control_column_name": "CPU",
-                                "status": 1
-                            })
-                        else:
-                            # Kontroller
-                            if (core_socket_rate != 8 and logical_cpu > 8) or (logical_cpu <= 4 and socket_count > 1):
+                        ServerInfo = pd.read_excel(excel_data, sheet_name="ServerInfo")
+                        server_row = ServerInfo.iloc[0]
+                        vm_info = server_row['Sanal Server']
+
+                        if vm_info == 'Yes':
+
+                            # CPU bilgilerini al
+                            logical_cpu = sheet_df["Logical CPU"].iloc[0]
+                            physical_cpu = sheet_df["Physical CPU"].iloc[0]
+                            socket_count = sheet_df["Socket Count"].iloc[0]
+                            # Core/Socket oranını hesapla
+
+                            if socket_count == 0 :
+                                core_socket_rate = 0
+                            else:
+                                core_socket_rate = logical_cpu / socket_count
+
+                            core_socket_special = [[2, 16], [2, 8], [2, 32], [1, 4], [2, 24], [2, 12], [2, 24], [1, 8],
+                                                   [2, 8], [4, 16]]
+                            if [socket_count, logical_cpu] in core_socket_special:
                                 rows.append({
                                     "control_column_name": "CPU",
                                     "status": 1
                                 })
                             else:
-                                rows.append({
-                                    "control_column_name": "CPU",
-                                    "status": 0
-                                })
+                                # Kontroller
+                                if (core_socket_rate == 8 and logical_cpu > 8) or (logical_cpu <= 4 and socket_count > 1):
+                                    rows.append({
+                                        "control_column_name": "CPU",
+                                        "status": 1
+                                    })
+                                else:
+                                    rows.append({
+                                        "control_column_name": "CPU",
+                                        "status": 2
+                                    })
+                        else:
+                            rows.append({
+                                "control_column_name": "CPU",
+                                "status": 2
+                                })                           
+
+                            
                     except Exception as e:
                         self.log_error(e, "CPU")
 
@@ -2936,6 +2960,16 @@ class SQLServerConnectionUI(QWidget):
             server_row = ServerInfo.iloc[0]
 
             summary_string = f"{server_row['Sunucu']} - {server_row['Edition']} - {server_row['SQL Version']} - {server_row['Version']}"
+            
+            if server_row['HA'] == '1' :
+                HA_temp ='Yes'
+            else:
+                HA_temp='No'
+            
+            if server_row['Cluster'] == '1' :
+                cluster_temp ='Yes'
+            else:
+                cluster_temp='No'
 
             serverinfodata = [
                 ['SERVER INFO'],  # Başlık
@@ -2943,8 +2977,8 @@ class SQLServerConnectionUI(QWidget):
                 ['COLLATION', server_row['Collation']],
                 ['CPU', server_row['CPU']],
                 ['RAM (MB)', server_row['RAM (MB)']],
-                ['CLUSTER', server_row['Cluster']],
-                ['HA', server_row['HA']],
+                ['CLUSTER', cluster_temp],
+                ['HA', HA_temp],
                 ['VM SERVER', server_row['Sanal Server']],
                 ['OS', server_row['OS']],
                 ['Cumulative Update', server_row['Cumulative Update']],
