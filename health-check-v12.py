@@ -2194,15 +2194,16 @@ class SQLServerConnectionUI(QWidget):
                     except Exception as e:
                         self.log_error(e, "DisableLogins")
 
-                elif sheet_name == 'PowerShellOutput':
+                elif sheet_name == 'PowerPlan':
                     # E126
                     try:
                         if 'Output' not in sheet_df.columns:
                             rows.append({"control_column_name": "PowerPlan", "status": 0, })
 
-                        power_scheme = sheet_df['Output'].iloc[0]  # Get the output value from the first row
+                        power_scheme = sheet_df['Output'].iloc[0].lower()  # Get the output value from the first row
+                        
                         # Check if the power scheme is set to 'High Performance'
-                        if "HighPerformance" in power_scheme or "YüksekPerformans" in power_scheme or "High Performance" in power_scheme or "Yüksek Performans" in power_scheme:
+                        if "highperformance" in power_scheme or "yüksekperformans" in power_scheme or "high performance" in power_scheme or "yüksek performans" in power_scheme:
                             status = 1  # Correct power scheme, successful status
                         else:
                             status = 2  # Incorrect power scheme, warning status
@@ -2210,7 +2211,7 @@ class SQLServerConnectionUI(QWidget):
                         # Append the result and message to the rows list
                         rows.append({"control_column_name": "PowerPlan", "status": status})
                     except Exception as e:
-                        self.log_error(e, "PowerPlan")
+                        self.log_error(e, f"PowerPlan {power_scheme}")
 
                 elif sheet_name == 'ORPHANUSER':
                     # E127

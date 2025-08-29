@@ -67,3 +67,23 @@ Traceback (most recent call last):
 AttributeError: 'list' object has no attribute 'empty'
 
 
+2025-08-29 14:43:27.783860 - Error: ('28000', "[28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user 'admn0'. (18456) (SQLDriverConnect); [28000] [Microsoft][ODBC Driver 17 for SQL Server]Invalid connection string attribute (0); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user 'admn0'. (18456); [28000] [Microsoft][ODBC Driver 17 for SQL Server]Invalid connection string attribute (0)")
+Function: Tried ODBC: {valid_driver} or failed test_connection
+Stack Trace:
+Traceback (most recent call last):
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\health-check-v12.py", line 1236, in test_connection
+    self.connection = pyodbc.connect(self.conn_str, autocommit=True)
+                      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pyodbc.InterfaceError: ('28000', "[28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user 'admn0'. (18456) (SQLDriverConnect); [28000] [Microsoft][ODBC Driver 17 for SQL Server]Invalid connection string attribute (0); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user 'admn0'. (18456); [28000] [Microsoft][ODBC Driver 17 for SQL Server]Invalid connection string attribute (0)")
+
+
+2025-08-29 14:55:53.190055 - Error: ('42S02', "[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot drop the table '#PowerPlan', because it does not exist or you do not have permission. (3701) (SQLExecDirectW)")
+Function: SQL Execution Error
+Stack Trace:
+Traceback (most recent call last):
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\health-check-v12.py", line 3448, in run_scripts_and_export
+    cursor.execute(statement)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^
+pyodbc.ProgrammingError: ('42S02', "[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot drop the table '#PowerPlan', because it does not exist or you do not have permission. (3701) (SQLExecDirectW)")
+
+

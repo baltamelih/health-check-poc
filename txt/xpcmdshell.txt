@@ -1,6 +1,6 @@
-IF OBJECT_ID('tempdb..#PowerShellOutput') IS NOT NULL
+IF OBJECT_ID('tempdb..#PowerPlan') IS NOT NULL
 BEGIN
-    DROP TABLE #PowerShellOutput;
+    DROP TABLE #PowerPlan;
 END
 DECLARE @InitialAdvancedOptionsSetting BIT;
 DECLARE @InitialXpCmdShellSetting BIT;
@@ -21,19 +21,19 @@ BEGIN
 END
 
 -- Create a temporary table for PowerShell output
-CREATE TABLE #PowerShellOutput (
+CREATE TABLE #PowerPlan(
     Output NVARCHAR(MAX)
 );
 
 -- Execute the PowerShell command and store only the scheme name
-INSERT INTO #PowerShellOutput (Output)
+INSERT INTO #PowerPlan (Output)
 EXEC xp_cmdshell 'powershell -Command "(powercfg /GetActiveScheme) -replace ''^.\((.?)\)$'', ''$1''"' ;
 
 -- Delete NULL or empty rows
-DELETE FROM #PowerShellOutput WHERE Output IS NULL OR Output = '';
+DELETE FROM #PowerPlan WHERE Output IS NULL OR Output = '';
 
 -- Format the result: "High Performance" to "HighPerformance"
-UPDATE #PowerShellOutput
+UPDATE #PowerPlan
 SET Output = CASE
                 WHEN Output = 'High Performance' THEN 'HighPerformance'
                 ELSE Output
@@ -113,6 +113,6 @@ END
 ---------------------------------------powerplan--------------------------------------
 
 
-SELECT * FROM #PowerShellOutput;
+SELECT * FROM #PowerPlan;
 SELECT * FROM #SystemDrive;
 

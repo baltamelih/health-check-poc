@@ -27,7 +27,7 @@ DROP TABLE #SamePasswordLogins;
 DROP TABLE #PolicyNotCheckedLogins;
 DROP TABLE #SystemDrive;
 DROP TABLE #BackupLogRunning;
-DROP TABLE #PowerShellOutput;
+DROP TABLE #PowerPlan;
 DROP TABLE #ServerLogins
 DROP TABLE #CPUInfo;
 DROP TABLE #ServiceAccount;
