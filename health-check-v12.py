@@ -61,7 +61,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QDate,QTimer
 import pyodbc
 import pandas as pd
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from datetime import datetime, timedelta
 from reportlab.lib.pagesizes import A4
@@ -1361,9 +1361,11 @@ class SQLServerConnectionUI(QWidget):
 
             # Excel dosyasını oku
             excel_data = pd.ExcelFile(excel_path)
+
+            updated_sheets= {}
+
             ServerInfoControl = pd.read_excel(excel_data, sheet_name="ServerInfo")
-            version = ServerInfoControl['Version']
-            version = str(version.iloc[0])
+            version = str(ServerInfoControl['Version'].iloc[0])
 
             # Sheet isimlerine göre analiz yap
             for sheet_name in excel_data.sheet_names:
@@ -2126,44 +2128,62 @@ class SQLServerConnectionUI(QWidget):
                         self.log_error(e, "ExpensiveQueries")
 
                 elif sheet_name == "JobHistory":
-
                     # E124
-
-                    # Önce LongRunningJobs kontrolü
                     try:
                         long_running_df = pd.read_excel(excel_data, sheet_name="LongRunningJobs")
                         if not long_running_df.empty:
-                            # Eğer long running job varsa direkt başarısız
                             rows.append({"control_column_name": "JobHistory", "status": 0})
                         else:
                             if not sheet_df.empty:
                                 success_outputs = []
                                 failed_outputs = []
                                 warning_outputs = []
+
+                                current_values = []
+
                                 for _, row in sheet_df.iterrows():
                                     run_status = str(row['RunStatus']).strip()
                                     job_status = str(row['Status']).strip()
                                     job_name = str(row['JobName']).strip()
+
                                     if run_status == 'Succeeded':
                                         success_outputs.append(f"{job_name} ----> SUCCESS")
+                                        current_values.append("SUCCESS")
                                     elif run_status == 'Failed':
                                         if job_status == 'Disable':
                                             success_outputs.append(f"{job_name} ----> SUCCESS")
+                                            current_values.append("SUCCESS")
                                         elif job_status == 'Enable':
                                             failed_outputs.append(f"{job_name} ----> FAILED")
+                                            current_values.append("FAILED")
+                                        else:
+                                            warning_outputs.append(f"{job_name} ----> UNKNOWN")
+                                            current_values.append("WARNING")
                                     else:
                                         if job_status == 'Enable':
                                             warning_outputs.append(f"{job_name} ----> UNKNOWN")
-                                # Genel status belirleme
+                                            current_values.append("WARNING")
+                                        else:
+                                            current_values.append("SUCCESS")
+
+                                # add column to dataframe
+                                sheet_df["current"] = current_values
+
+                                # genel status
                                 if failed_outputs:
-                                    status = 0  # FAILED
+                                    status = 0
                                 elif success_outputs and not failed_outputs:
-                                    status = 1  # SUCCESSFUL
+                                    status = 1
                                 elif warning_outputs and not failed_outputs:
-                                    status = 2  # WARNING
+                                    status = 2
+                                else:
+                                    status = 1
+
                             rows.append({"control_column_name": "JobHistory", "status": status})
+
                     except Exception as e:
                         self.log_error(e, "JobHistory")
+                      
 
                 elif sheet_name == "ServerLogins":
                     # E125
@@ -2563,6 +2583,19 @@ class SQLServerConnectionUI(QWidget):
                         rows.append({"control_column_name": "AutoShrink", "status": status})
                     except Exception as e:
                         self.log_error(e, "AutoShrink")
+            
+                                
+                    updated_sheets[sheet_name] = sheet_df
+                    continue       
+
+                updated_sheets[sheet_name] = sheet_df
+
+            del excel_data   
+            output_path = excel_path  # or a different path if you prefer to keep original
+            with pd.ExcelWriter(output_path, engine='openpyxl', mode='w') as writer:
+                for name, df in updated_sheets.items():
+                    df.to_excel(writer, sheet_name=name, index=False)
+                    
             import shutil
             import pandas as pd
             from openpyxl import load_workbook
@@ -2979,7 +3012,7 @@ class SQLServerConnectionUI(QWidget):
                 ['CPU', server_row['CPU']],
                 ['RAM (MB)', server_row['RAM (MB)']],
                 ['CLUSTER', cluster_temp],
-                ['HA', HA_temp],
+                ['High Availability', HA_temp],
                 ['VM SERVER', server_row['Sanal Server']],
                 ['OS', server_row['OS']],
                 ['Cumulative Update', server_row['Cumulative Update']],
