@@ -1865,7 +1865,7 @@ class SQLServerConnectionUI(QWidget):
                                     status = 0  # Başarısız
                             else:
                                 # 32 GB ve üstü
-                                if config_value < (total_memory_mb - 10000) and config_value >= (total_memory_mb * 0.5):
+                                if config_value < (total_memory_mb - 7000) and config_value >= (total_memory_mb * 0.5):
                                     status = 1  # Başarılı
                                 else:
                                     status = 0  # Başarısız
@@ -2097,13 +2097,15 @@ class SQLServerConnectionUI(QWidget):
                         })
                     except Exception as e:
                         self.log_error(e, "SQLServerAuthentication")
+
+
                 elif sheet_name == "WaitStats":
                     # E901
                     try:
                         if not sheet_df.empty:
-                            status = 2  # Warning: bekleme istatistiği var
+                            status = 4  # Warning: bekleme istatistiği var
                         else:
-                            status = 1  # Successful: bekleme problemi yok
+                            status = 0  # Successful: bekleme problemi yok
 
                         rows.append({
                             "control_column_name": "WaitStats",
@@ -2116,9 +2118,9 @@ class SQLServerConnectionUI(QWidget):
                     # E601
                     try:
                         if not sheet_df.empty:
-                            status = 2  # Warning: expensive query var
+                            status = 4  # Warning: expensive query var
                         else:
-                            status = 1  # Başarılı: expensive query yok
+                            status = 0  # Başarılı: expensive query yok
 
                         rows.append({
                             "control_column_name": "ExpensiveQueries",
@@ -2701,6 +2703,8 @@ class SQLServerConnectionUI(QWidget):
                             status = "Successful"
                         elif row["status"].iloc[0] == 2:
                             status = "Warning"
+                        elif row["status"].iloc[0] == 4:
+                            status = "Info"
                         else:
                             status = "Failed"
 
@@ -3274,6 +3278,9 @@ class SQLServerConnectionUI(QWidget):
                         elif value == "Warning":
                             table_styles.append(('BACKGROUND', (col_idx, idx), (col_idx, idx), HexColor("#FFA500")))
                             table_styles.append(('TEXTCOLOR', (col_idx, idx), (col_idx, idx), colors.whitesmoke))
+                        elif value == "Info":
+                            table_styles.append(('BACKGROUND', (col_idx, idx), (col_idx, idx), HexColor("#3d85c6")))
+                            table_styles.append(('TEXTCOLOR', (col_idx, idx), (col_idx, idx), colors.whitesmoke))
 
                 table2.setStyle(TableStyle(table_styles))
 
@@ -3348,6 +3355,11 @@ class SQLServerConnectionUI(QWidget):
                             ('BACKGROUND', (col_idx, idx), (col_idx, idx), HexColor("#FFA500")))  # Turuncu arka plan
                         table_styles.append(
                             ('TEXTCOLOR', (col_idx, idx), (col_idx, idx), colors.whitesmoke))  # Beyaz metin
+                    elif value == "Info":
+                        table_styles.append(
+                            ('BACKGROUND', (col_idx, idx), (col_idx, idx), HexColor("#3d85c6")))  
+                        table_styles.append(
+                            ('TEXTCOLOR', (col_idx, idx), (col_idx, idx), colors.whitesmoke))  
 
             table2.setStyle(TableStyle(table_styles))
             table_max_width = width - (margin_left * 2)  # Maximum width of the table
