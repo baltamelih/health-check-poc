@@ -53,9 +53,9 @@ BEGIN
     DROP TABLE #DatabaseSizeInfo;
 END
 
-IF OBJECT_ID('tempdb..#BackupStats') IS NOT NULL
+IF OBJECT_ID('tempdb..#DbGrowth') IS NOT NULL
 BEGIN
-    DROP TABLE #BackupStats;
+    DROP TABLE #DbGrowth;
 END
 
 IF OBJECT_ID('tempdb..#DeadlockPerformance') IS NOT NULL
@@ -589,7 +589,7 @@ DECLARE @startDate DATETIME;
 SET @startDate = GETDATE();
 
 -- Create a temporary table for backup growth statistics
-CREATE TABLE #BackupStats (
+CREATE TABLE #DbGrowth (
     DatabaseName NVARCHAR(255),
     [0] NUMERIC(10, 1),
     [-1] NUMERIC(10, 1),
@@ -607,7 +607,7 @@ CREATE TABLE #BackupStats (
 );
 
 -- Insert data into the temporary table
-INSERT INTO #BackupStats
+INSERT INTO #DbGrowth
 SELECT PVT.DatabaseName,
        ISNULL(PVT.[0], 0) AS [0],
        ISNULL(PVT.[-1], 0) AS [-1],
@@ -958,7 +958,7 @@ SELECT * FROM #DatabaseCPUUsage;
 SELECT * FROM #DatabaseFileInfo;
 SELECT * FROM #BackupDetails;
 SELECT * FROM #DatabaseSizeInfo;
-SELECT * FROM #BackupStats;
+SELECT * FROM #DbGrowth;
 SELECT * FROM #DeadlockPerformance;
 SELECT * FROM #DatabasePageVerifyInfo;
 SELECT * FROM #DatabaseCompatibilityInfo;

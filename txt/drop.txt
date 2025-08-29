@@ -9,7 +9,7 @@ DROP TABLE #DatabaseCPUUsage;
 DROP TABLE #DatabaseFileInfo;
 DROP TABLE #BackupDetails;
 DROP TABLE #DatabaseSizeInfo;
-DROP TABLE #BackupStats;
+DROP TABLE #DbGrowth;
 DROP TABLE #DeadlockPerformance;
 DROP TABLE #DBCCResults;
 DROP TABLE #temp;

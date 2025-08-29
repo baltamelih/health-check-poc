@@ -602,7 +602,7 @@ class CheckListWindow(QWidget):
             "Database Config": [
                 "BackupLogRunning", "DatabaseSizeInfo", "BackupDetails", "DBCCResults", "DatabasePageVerifyInfo",
                 "DatabaseCompatibilityInfo",
-                "DatabaseAutoShrinkInfo", "DatabaseAutoCloseInfo", "RecoveryModel", "BackupStats", "DatabaseFileInfo"
+                "DatabaseAutoShrinkInfo", "DatabaseAutoCloseInfo", "RecoveryModel", "DbGrowth", "DatabaseFileInfo"
             ]
         }
 
@@ -1318,7 +1318,7 @@ class SQLServerConnectionUI(QWidget):
                 "Parameter": [
                     "AlwaysOn", "SPCU", "SQLServerVersion", "MaxMemory", "MinMemory", "SQLFiles", "TempDB",
                     "LogFiles", "PowerPlan", "LocalSecurityPolicy", "ServerConfig", "Antivirus",
-                    "CompressionBackup", "BackupManagement", "DatabaseSize", "BackupStats", "Deadlock", "CheckDB",
+                    "CompressionBackup", "BackupManagement", "DatabaseSize", "DbGrowth", "Deadlock", "CheckDB",
                     "PageVerify", "CompatibilityLevel", "AutoShrink", "AutoClose", "RecoveryModel", "Storage",
                     "SystemDatabases", "JobHistory", "CPU", "ServiceAccount", "ServiceAccountPermission", "SaAccount",
                     "OrphanUser", "VLFCount", "EmptyPasswordLogins", "PolicyNotCheckedLogins", "SamePasswordLogins",
@@ -2300,12 +2300,12 @@ class SQLServerConnectionUI(QWidget):
                     except Exception as e:
                         self.log_error(e, "BackupManagement")
 
-                elif sheet_name == "BackupStats":
+                elif sheet_name == "DbGrowth":
                     # E131
                     try:
                         if sheet_df.empty:
                             # Veri bulunmadığında durumu rows listesine ekle
-                            rows.append({"control_column_name": "BackupStats", "status": 0})
+                            rows.append({"control_column_name": "DbGrowth", "status": 0})
                         else:
                             # İlgili sütunları al (DatabaseName hariç)
                             columns = [col for col in sheet_df.columns if col != "DatabaseName"]
@@ -2336,9 +2336,9 @@ class SQLServerConnectionUI(QWidget):
                                 status = 1  # Değişim olmadığı varsayılır
 
                             # Son durumu rows listesine tek bir kayıt olarak ekle
-                            rows.append({"control_column_name": "BackupStats", "status": status})
+                            rows.append({"control_column_name": "DbGrowth", "status": status})
                     except Exception as e:
-                        self.log_error(e, "BackupStats")
+                        self.log_error(e, "DbGrowth")
 
 
 
@@ -2685,7 +2685,7 @@ class SQLServerConnectionUI(QWidget):
                     "AutoClose",
                     "RecoveryModel",
                     "ExpensiveQueries",
-                    "BackupStats"
+                    "DbGrowth"
 
 
                 ],
