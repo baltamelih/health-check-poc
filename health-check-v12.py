@@ -2133,8 +2133,17 @@ class SQLServerConnectionUI(QWidget):
                     # E124
                     try:
                         long_running_df = pd.read_excel(excel_data, sheet_name="LongRunningJobs")
+                        print(long_running_df["JobName"])
+
                         if not long_running_df.empty:
-                            rows.append({"control_column_name": "JobHistory", "status": 0})
+                            # JobName kolonundaki tüm değerleri kontrol et (case-insensitive)
+                            all_dba = long_running_df['JobName'].astype(str).str.lower().str.startswith("dba").all()
+
+                            if all_dba:
+                                rows.append({"control_column_name": "JobHistory", "status": 1})
+                            else:
+                                rows.append({"control_column_name": "JobHistory", "status": 0})
+                        
                         else:
                             if not sheet_df.empty:
                                 success_outputs = []
@@ -2163,7 +2172,6 @@ class SQLServerConnectionUI(QWidget):
                                             current_values.append("WARNING")
                                     else:
                                         if job_status == 'Enable':
-                                            warning_outputs.append(f"{job_name} ----> UNKNOWN")
                                             current_values.append("WARNING")
                                         else:
                                             current_values.append("SUCCESS")
@@ -2188,10 +2196,19 @@ class SQLServerConnectionUI(QWidget):
                       
 
                 elif sheet_name == "ServerLogins":
+                    
                     # E125
                     try:
-                        if sheet_df.empty:
-                            rows.append({"control_column_name": "DisableLogins", "status": 1})
+                        
+                        long_running_df = pd.read_excel(excel_data, sheet_name="LongRunningJobs")
+                        print(long_running_df) 
+                        if not long_running_df.empty:
+                            # JobName kolonundaki tüm değerleri kontrol et (case-insensitive)
+                            all_dba = long_running_df['JobName'].astype(str).str.lower().str.startswith("dba").all()
+
+                            if all_dba:
+                                rows.append({"control_column_name": "JobHistory", "status": 1})
+                                continue
 
                         high_privileges = ['sysadmin', 'serveradmin', 'db_owner']
                         issue_found = False
