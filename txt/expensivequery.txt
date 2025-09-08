@@ -1,0 +1,45 @@
+IF OBJECT_ID('tempdb..#ExpensiveQueries') IS NOT NULL DROP TABLE #ExpensiveQueries;
+
+CREATE TABLE #ExpensiveQueries (
+	TotalWorkerTime BIGINT,
+	TotalLogicalIO BIGINT,
+	ExeCnt INT,
+	LastUsage DATETIME,
+	AvgCPUTimeMiS BIGINT,
+	AvgLogicalIO BIGINT,
+	DatabaseName NVARCHAR(128),
+	SqlStatement NVARCHAR(MAX)
+);
+
+DECLARE @MinExecutions INT;
+SET @MinExecutions = 5;
+
+-- Temp tabloya veri ekle
+INSERT INTO #ExpensiveQueries
+SELECT TOP 20
+	EQS.total_worker_time AS TotalWorkerTime,
+	EQS.total_logical_reads + EQS.total_logical_writes AS TotalLogicalIO,
+	EQS.execution_count AS ExeCnt,
+	EQS.last_execution_time AS LastUsage,
+	EQS.total_worker_time / EQS.execution_count AS AvgCPUTimeMiS,
+	(EQS.total_logical_reads + EQS.total_logical_writes) / EQS.execution_count AS AvgLogicalIO,
+	DB.name AS DatabaseName,
+	SUBSTRING(EST.text,
+	          1 + EQS.statement_start_offset / 2,
+	          (CASE
+	          	WHEN EQS.statement_end_offset = -1
+	          	THEN LEN(CONVERT(NVARCHAR(MAX), EST.text)) * 2
+	          	ELSE EQS.statement_end_offset END
+	          	- EQS.statement_start_offset) / 2) AS SqlStatement
+FROM sys.dm_exec_query_stats AS EQS
+CROSS APPLY sys.dm_exec_sql_text(EQS.sql_handle) AS EST
+CROSS APPLY sys.dm_exec_query_plan(EQS.plan_handle) AS EQP
+LEFT JOIN sys.databases AS DB ON EST.dbid = DB.database_id
+WHERE EQS.execution_count > @MinExecutions
+	AND EQS.last_execution_time > DATEADD(MONTH, -1, GETDATE())
+ORDER BY AvgLogicalIO DESC, AvgCPUTimeMiS DESC;
+
+
+SELECT * FROM #ExpensiveQueries;
+
+

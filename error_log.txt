@@ -1,0 +1,40 @@
+2025-09-09 00:35:19.636039 - Error: ('08001', '[08001] [Microsoft][ODBC Driver 18 for SQL Server]SSL Provider: [error:0A000086:SSL routines::certificate verify failed:self-signed certificate] (-1) (SQLDriverConnect)')
+Function: Tried ODBC: {valid_driver} or failed test_connection
+Stack Trace:
+Traceback (most recent call last):
+  File "/home/vlhn/dev/DataPlatform/dp-hc-poc/health-check-poc/health-check-v12.py", line 1206, in test_connection
+    self.connection = pyodbc.connect(self.conn_str, autocommit=True)
+                      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pyodbc.OperationalError: ('08001', '[08001] [Microsoft][ODBC Driver 18 for SQL Server]SSL Provider: [error:0A000086:SSL routines::certificate verify failed:self-signed certificate] (-1) (SQLDriverConnect)')
+
+
+2025-09-09 00:35:32.955110 - Error: ('08001', '[08001] [Microsoft][ODBC Driver 18 for SQL Server]SSL Provider: [error:0A000086:SSL routines::certificate verify failed:self-signed certificate] (-1) (SQLDriverConnect)')
+Function: Tried ODBC: {valid_driver} or failed test_connection
+Stack Trace:
+Traceback (most recent call last):
+  File "/home/vlhn/dev/DataPlatform/dp-hc-poc/health-check-poc/health-check-v12.py", line 1206, in test_connection
+    self.connection = pyodbc.connect(self.conn_str, autocommit=True)
+                      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pyodbc.OperationalError: ('08001', '[08001] [Microsoft][ODBC Driver 18 for SQL Server]SSL Provider: [error:0A000086:SSL routines::certificate verify failed:self-signed certificate] (-1) (SQLDriverConnect)')
+
+
+2025-09-09 00:36:25.669678 - Error: ('HYT00', '[HYT00] [Microsoft][ODBC Driver 18 for SQL Server]Login timeout expired (0) (SQLDriverConnect)')
+Function: Tried ODBC: {valid_driver} or failed test_connection
+Stack Trace:
+Traceback (most recent call last):
+  File "/home/vlhn/dev/DataPlatform/dp-hc-poc/health-check-poc/health-check-v12.py", line 1206, in test_connection
+    self.connection = pyodbc.connect(self.conn_str, autocommit=True)
+                      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pyodbc.OperationalError: ('HYT00', '[HYT00] [Microsoft][ODBC Driver 18 for SQL Server]Login timeout expired (0) (SQLDriverConnect)')
+
+
+2025-09-09 00:36:46.722770 - Error: ('HYT00', '[HYT00] [Microsoft][ODBC Driver 18 for SQL Server]Login timeout expired (0) (SQLDriverConnect)')
+Function: Tried ODBC: {valid_driver} or failed test_connection
+Stack Trace:
+Traceback (most recent call last):
+  File "/home/vlhn/dev/DataPlatform/dp-hc-poc/health-check-poc/health-check-v12.py", line 1206, in test_connection
+    self.connection = pyodbc.connect(self.conn_str, autocommit=True)
+                      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pyodbc.OperationalError: ('HYT00', '[HYT00] [Microsoft][ODBC Driver 18 for SQL Server]Login timeout expired (0) (SQLDriverConnect)')
+
+

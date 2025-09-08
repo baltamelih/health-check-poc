@@ -1,0 +1,26 @@
+------------------[Long Running Jobs - Over 300 Minutes]------------------
+
+-- Create a temporary table for long-running jobs
+CREATE TABLE #LongRunningJobs (
+    JobName NVARCHAR(255),
+    StartTime DATETIME,
+    RunningMinutes INT,
+    SessionID INT
+);
+
+-- Insert data into the temporary table
+INSERT INTO #LongRunningJobs
+SELECT
+    j.name AS JobName,
+    ja.start_execution_date AS StartTime,
+    DATEDIFF(MINUTE, ja.start_execution_date, GETDATE()) AS RunningMinutes,
+    ja.session_id AS SessionID
+FROM msdb.dbo.sysjobactivity ja
+JOIN msdb.dbo.sysjobs j
+    ON ja.job_id = j.job_id
+WHERE ja.start_execution_date IS NOT NULL
+  AND ja.stop_execution_date IS NULL
+  AND DATEDIFF(MINUTE, ja.start_execution_date, GETDATE()) > 300;
+
+-- Select result
+SELECT * FROM #LongRunningJobs;

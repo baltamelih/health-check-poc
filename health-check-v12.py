@@ -1,18 +1,6 @@
-from dp_script import SECURITY_SCRIPT_BASE64  # İlk script
-from vlf_count import SECURITY_SCRIPT54_BASE64
-from dp_script2 import SECURITY_SCRIPT2_BASE64 #Hcv999
-from backup_status_check import SECURITY_SCRIPT5_BASE64
-from policy_login_check import SECURITY_SCRIPT6_BASE64
-from credential_reuse_check import  SECURITY_SCRIPT7_BASE64
-from schema_cleanup import SECURITY_SCRIPT8_BASE64
-from dp_script3 import SECURITY_SCRIPT10_BASE64
-from sql_execute_extended import SECURITY_SCRIPT11_BASE64
-from job_history_report import SECURITY_SCRIPT14_BASE64
-from service_account_permissions import SECURITY_SCRIPT15_BASE64
-from builtin_accounts_audit import SECURITY_SCRIPT16_BASE64
-from server_auth import SECURITY_SCRIPT17_BASE64
-from expensive_queries_report import SECURITY_SCRIPT18_BASE64
-from wait_type_summary import SECURITY_SCRIPT19_BASE64
+
+
+
 import threading
 import subprocess
 import signal
@@ -25,74 +13,56 @@ import getpass
 import re
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('Agg')
-from PyPDF2 import PdfReader, PdfWriter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib import colors
 import numpy as np
+import chardet
+import io
+import hashlib
+import json
+import pyodbc
+import pandas as pd
+from datetime import datetime, timedelta
+
+from PyPDF2 import PdfReader, PdfWriter
+
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.pagesizes import letter
-from PyPDF2 import PdfReader
-import chardet
+from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfgen import canvas
 from reportlab.graphics.shapes import Drawing, String, Path, Circle
 from reportlab.graphics import renderPDF
 from reportlab.lib.colors import HexColor
-from math import cos, sin, radians
-from PIL import Image
-from reportlab.lib.utils import ImageReader
-import io
-import hashlib
-import json
-import getpass
-from cryptography.fernet import Fernet
-from reportlab.graphics.renderPDF import drawToString
-from PyQt5.QtWidgets import (
-    QProgressDialog,QFileDialog,QDialog,QSplashScreen,QApplication, QWidget, QLabel, QLineEdit, QComboBox, QPushButton, QMessageBox, QCheckBox, QGridLayout,QScrollArea
-)
-from PyQt5.QtWidgets import (
-    QProgressBar,QTextEdit,QWidget, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QComboBox,
-    QCheckBox, QPushButton, QMessageBox, QDateEdit, QListWidget, QRadioButton, QStackedWidget,QTableWidget,
-    QDateTimeEdit, QListWidgetItem
-)
-from PyQt5.QtCore import QDateTime
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt, QDate,QTimer
-import pyodbc
-import pandas as pd
-from openpyxl import Workbook, load_workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
-from datetime import datetime, timedelta
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.platypus import Table, TableStyle
-from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
+from reportlab.graphics.renderPDF import drawToString
+
+from PIL import Image
+
+from cryptography.fernet import Fernet
+
+from openpyxl import Workbook, load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QLineEdit, QComboBox, QCheckBox, QPushButton,
-    QVBoxLayout, QHBoxLayout, QFormLayout, QFrame
+    QProgressDialog, QFileDialog, QDialog, QSplashScreen, QApplication, QWidget, QLabel,
+    QLineEdit, QComboBox, QPushButton, QMessageBox, QCheckBox, QGridLayout, QScrollArea,
+    QProgressBar, QTextEdit, QVBoxLayout, QHBoxLayout, QFormLayout, QFrame,
+    QDateEdit, QListWidget, QRadioButton, QStackedWidget, QTableWidget,
+    QDateTimeEdit, QListWidgetItem, QHeaderView, QSizePolicy
 )
-from PyQt5.QtGui import QFont, QIcon
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
-    QListWidget,
-    QProgressBar
-)
+from PyQt5.QtCore import QDateTime, Qt, QDate, QTimer
+from PyQt5.QtGui import QPixmap, QFont, QIcon
 
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget, QLabel,QHeaderView,QTableWidgetItem
-from PyQt5.QtGui import QPixmap, QFont
-from PyQt5.QtCore import Qt
-
-from PyQt5.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QStackedWidget, QLabel
-)
-from PyQt5.QtGui import QPixmap, QFont
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QSizePolicy
+def read_script(filename):
+    try:
+        script_path = os.path.join("src", filename)
+        with open(script_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        print(f"Error reading or decoding script {filename}: {e}")
+        return ""
 
 class MainUI(QWidget):
     def __init__(self):
@@ -3463,28 +3433,34 @@ class SQLServerConnectionUI(QWidget):
             self.main_ui.checklist_page.set_output_path(output_path)
             self.main_ui.stack.setCurrentWidget(self.main_ui.checklist_page)
 
-            encoded_scripts = [SECURITY_SCRIPT18_BASE64,
-                               SECURITY_SCRIPT54_BASE64,
-                               SECURITY_SCRIPT_BASE64, SECURITY_SCRIPT2_BASE64,
-                               SECURITY_SCRIPT16_BASE64,
-                               SECURITY_SCRIPT5_BASE64,
-                               SECURITY_SCRIPT6_BASE64, SECURITY_SCRIPT7_BASE64, SECURITY_SCRIPT10_BASE64,
-                               SECURITY_SCRIPT11_BASE64,
-                               SECURITY_SCRIPT19_BASE64, SECURITY_SCRIPT17_BASE64, SECURITY_SCRIPT15_BASE64,
-                               SECURITY_SCRIPT14_BASE64, SECURITY_SCRIPT8_BASE64
-                               ]
+            scripts_to_run = [
+                "dp_script.txt",
+                "vlf_count.txt",
+                "dp_script2.txt",
+                "backup_status_check.txt",
+                "policy_login_check.txt",
+                "credential_reuse_check.txt",
+                "dp_script3.txt",
+                "sql_execute_extended.txt",
+                "job_history_report.txt",
+                "service_account_permissions.txt",
+                "builtin_accounts_audit.txt",
+                "server_auth.txt",
+                "expensive_queries_report.txt",
+                "wait_type_summary.txt",
+                "schema_cleanup.txt"
+            ]
 
             with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
                 sheet_added = False
-                for encoded_script in encoded_scripts:
+                for script_file in scripts_to_run:
                     cursor = self.connection.cursor()
-                    decoded_bytes = base64.b64decode(encoded_script)
-                    detected = chardet.detect(decoded_bytes)
-                    encoding = detected.get('encoding', 'utf-8')
-                    decoded_script = decoded_bytes.decode(encoding, errors='ignore')
-                    statements = decoded_script.split("GO")
-                    select_statements = re.findall(r"(SELECT\s+\*.*?FROM\s+#\w+;)", decoded_script, re.IGNORECASE)
-                    table_names = self.extract_table_names(decoded_script)
+                    script_content = read_script(script_file)
+                    if not script_content:
+                        continue
+                    statements = script_content.split("GO")
+                    select_statements = re.findall(r"(SELECT\s+\*.*?FROM\s+#\w+;)", script_content, re.IGNORECASE)
+                    table_names = self.extract_table_names(script_content)
 
                     for statement in statements:
                         statement = statement.strip()
@@ -3492,7 +3468,7 @@ class SQLServerConnectionUI(QWidget):
                             try:
                                 cursor.execute(statement)
                             except Exception as e:
-                                self.log_error(e, "SQL Execution Error")
+                                self.log_error(e, f"SQL Execution Error in {script_file}")
 
                     for i, select in enumerate(select_statements):
                         table_name = table_names[i] if i < len(table_names) else f"Sheet{i + 1}"
@@ -3515,7 +3491,7 @@ class SQLServerConnectionUI(QWidget):
                                     data = pd.DataFrame.from_records(rows, columns=columns)
                                     if data.empty and columns:
                                         data = pd.DataFrame(
-                                            columns=columns)  # Boş DataFrame, sadece sütun başlıkları ile
+                                            columns=columns)
                                     if not data.empty or columns:
                                         data.to_excel(writer, sheet_name=table_name[:31], index=False, header=True)
                                         sheet_added = True
@@ -3523,16 +3499,16 @@ class SQLServerConnectionUI(QWidget):
                                     self.main_ui.checklist_page.update_list(selected, True)
 
                             except Exception as e:
-                                self.log_error(e, "cursor_error")
+                                self.log_error(e, f"cursor_error in {script_file}")
 
                         except Exception as e:
                             self.checklist_window.update_list(selected, False)
-                            self.log_error(e, "windows_group_error")
+                            self.log_error(e, f"windows_group_error in {script_file}")
                             continue
                         time.sleep(0.3)
-                    if not sheet_added:
-                        df_placeholder = pd.DataFrame({"No Data": ["No queries returned results"]})
-                        df_placeholder.to_excel(writer, sheet_name="Placeholder", index=False)
+                if not sheet_added:
+                    df_placeholder = pd.DataFrame({"No Data": ["No queries returned results"]})
+                    df_placeholder.to_excel(writer, sheet_name="Placeholder", index=False)
             self.main_ui.checklist_page.finalize_progress()
             #self.main_ui.checklist_page.setVisible(False)
             QMessageBox.information(self, "SUCCESS",

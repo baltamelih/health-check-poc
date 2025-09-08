@@ -1,0 +1,85 @@
+-- xp_cmdshell benzeri extended prosedürler için aktiflik kontrolü ve geçici değişim
+DECLARE @WasAdvancedOptionsEnabled BIT = 0;
+DECLARE @WasCmdShellEnabled BIT = 0;
+
+-- Gelişmiş seçenekler açık mı?
+IF EXISTS (
+    SELECT * FROM sys.configurations
+    WHERE name = 'show advanced options' AND value_in_use = 1
+)
+    SET @WasAdvancedOptionsEnabled = 1;
+
+-- xp_cmdshell açık mı? (proxy olarak kullanıyoruz)
+IF EXISTS (
+    SELECT * FROM sys.configurations
+    WHERE name = 'xp_cmdshell' AND value_in_use = 1
+)
+    SET @WasCmdShellEnabled = 1;
+
+-- Gelişmiş ayarlar açık değilse aç
+IF @WasAdvancedOptionsEnabled = 0
+BEGIN
+    EXEC sp_configure 'show advanced options', 1;
+    RECONFIGURE;
+END
+
+-- xp_cmdshell açık değilse (proxy) aç (bu sayede xp_instance_regread çalışır)
+IF @WasCmdShellEnabled = 0
+BEGIN
+    EXEC sp_configure 'xp_cmdshell', 1;
+    RECONFIGURE;
+END
+
+--------------------------------------------------------------------------------
+
+-- Daha önce varsa sil
+IF OBJECT_ID('tempdb..#SQLServerAuthentication') IS NOT NULL DROP TABLE #SQLServerAuthentication;
+
+-- Temp tabloyu oluştur
+CREATE TABLE #SQLServerAuthentication (
+    Sunucu NVARCHAR(255),
+    LoginModeValue INT,
+    [Login Mode] NVARCHAR(100)
+);
+
+-- Registry'den login mode bilgisini oku
+DECLARE @LoginMode INT;
+
+EXEC master.dbo.xp_instance_regread
+    N'HKEY_LOCAL_MACHINE',
+    N'Software\Microsoft\MSSQLServer\MSSQLServer',
+    N'LoginMode',
+    @LoginMode OUTPUT;
+
+-- Temp tabloya ekle
+INSERT INTO #SQLServerAuthentication (Sunucu, LoginModeValue, [Login Mode])
+SELECT
+    CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')),
+    @LoginMode,
+    CASE @LoginMode
+        WHEN 1 THEN 'Windows Authentication'
+        WHEN 2 THEN 'SQL Server and Windows Authentication (Mixed Mode)'
+        ELSE 'Bilinmiyor'
+    END;
+
+-- Sonuçları göster
+
+
+--------------------------------------------------------------------------------
+
+-- xp_cmdshell eski haline döndür
+IF @WasCmdShellEnabled = 0
+BEGIN
+    EXEC sp_configure 'xp_cmdshell', 0;
+    RECONFIGURE;
+END
+
+-- Gelişmiş ayarlar da kapalıydıysa tekrar kapat
+IF @WasAdvancedOptionsEnabled = 0
+BEGIN
+    EXEC sp_configure 'show advanced options', 0;
+    RECONFIGURE;
+END
+
+
+SELECT * FROM #SQLServerAuthentication;

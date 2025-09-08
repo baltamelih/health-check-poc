@@ -1,0 +1,15 @@
+IF OBJECT_ID('tempdb..#BuiltinAdmin') IS NOT NULL DROP TABLE #ServerPrincipals;
+
+CREATE TABLE #BuiltinAdmin (
+	[name] NVARCHAR(256),
+	[type_desc] NVARCHAR(60),
+	[is_disabled] BIT
+);
+
+
+INSERT INTO #BuiltinAdmin
+SELECT [name], [type_desc], [is_disabled]
+FROM sys.server_principals
+WHERE name = 'BUILTIN\Administrators';
+
+SELECT * FROM #BuiltinAdmin;
