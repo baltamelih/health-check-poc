@@ -11,6 +11,7 @@ import getpass
 import re
 import matplotlib.pyplot as plt
 import matplotlib
+from dotenv import load_dotenv
 matplotlib.use('Agg')
 from PyPDF2 import PdfReader, PdfWriter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
@@ -32,7 +33,6 @@ import io
 import hashlib
 import json
 import getpass
-from cryptography.fernet import Fernet
 from reportlab.graphics.renderPDF import drawToString
 from PyQt5.QtWidgets import (
     QProgressDialog,QFileDialog,QDialog,QSplashScreen,QApplication, QWidget, QLabel, QLineEdit, QComboBox, QPushButton, QMessageBox, QCheckBox, QGridLayout,QScrollArea
@@ -79,6 +79,51 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QSizePolicy
+
+from pathlib import Path
+from cryptography.fernet import Fernet
+load_dotenv() 
+_ENV_KEY_NAME = "SECRET_KEY"
+
+def _get_cipher() -> Fernet:
+    key = os.getenv(_ENV_KEY_NAME)
+    if not key:
+        raise RuntimeError(
+            f"{_ENV_KEY_NAME} bulunamadı. "
+            "Aynı key ile şifrelemiştik; uygulama başlamadan önce environment'a koy."
+        )
+    return Fernet(key.encode("utf-8"))
+
+def read_b64_from_enc(path: Path) -> str:
+    """
+    .enc dosyasından -> Fernet decrypt -> (içi zaten Base64 string) -> str döndür.
+    """
+    cipher = _get_cipher()
+    enc_bytes = path.read_bytes()
+    b64_bytes = cipher.decrypt(enc_bytes)  # dönen şey Base64 string'in bytes hali
+    return b64_bytes.decode("utf-8")
+
+def read_b64_auto(path: Path) -> str:
+    """
+    Geriye dönük uyumluluk: önce .enc dene; yoksa .txt'yi düz oku (Base64 metin).
+    """
+    p = Path(path)
+    if p.suffix == ".enc" and p.exists():
+        return read_b64_from_enc(p)
+    if p.suffix == ".txt" and p.exists():
+        return p.read_text(encoding="utf-8")
+    # otomatik isim denemesi: foo.enc varsa onu, yoksa foo.txt’yi dene
+    if p.with_suffix(".enc").exists():
+        return read_b64_from_enc(p.with_suffix(".enc"))
+    if p.with_suffix(".txt").exists():
+        return p.with_suffix(".txt").read_text(encoding="utf-8")
+    raise FileNotFoundError(f"Ne {p.name} ne de {p.stem+'.enc'} bulundu.")
+
+
+
+
+
+
 
 class MainUI(QWidget):
     def __init__(self):
@@ -265,7 +310,7 @@ class MainUI(QWidget):
 
         # Logo
         logo = QLabel()
-        pix_path = self.get_resource_path("dplogo1.png")
+        pix_path = self.get_resource_path("public/dplogo1.png")
         pix = QPixmap(pix_path)
         logo.setPixmap(pix.scaled(480, 480, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         logo.setAlignment(Qt.AlignCenter)
@@ -1231,7 +1276,7 @@ class SQLServerConnectionUI(QWidget):
                 else:
                     base_path = os.path.abspath(".")
 
-                file_path = os.path.join(base_path, "serverinfo.txt")
+                file_path = os.path.join(base_path, "src/serverinfo.txt")
 
                 with open(file_path, "r", encoding="utf-8") as f:
                     server_info_sql = f.read()
@@ -2852,7 +2897,7 @@ class SQLServerConnectionUI(QWidget):
             base_path = os.path.dirname(os.path.abspath(__file__))
 
             # Watermark dosyasının yolu (main.py ile aynı dizinde)
-            watermark_image = os.path.join(base_path, "dplogo.png")
+            watermark_image = os.path.join(base_path, "public/dplogo.png")
             # Mevcut PDF'yi oku
             existing_pdf = PdfReader(input_pdf)
             total_pages = len(existing_pdf.pages)  # Mevcut PDF'deki toplam sayfa sayısını al
@@ -2867,7 +2912,7 @@ class SQLServerConnectionUI(QWidget):
             img.putalpha(alpha)
 
             # Yeni PNG olarak kaydet (geçici dosya)
-            temp_watermark = "temp_watermark1.png"
+            temp_watermark = "public/temp_watermark1.png"
             img.save(temp_watermark)
 
             # Yeni PDF dosyası oluştur
@@ -2911,7 +2956,7 @@ class SQLServerConnectionUI(QWidget):
             QApplication.processEvents()
             time.sleep(0.5)
             QApplication.processEvents()  # UI güncellenmesini sağla
-            font_path = self.get_resource_path("arialbd.ttf")
+            font_path = self.get_resource_path("public/arialbd.ttf")
             pdfmetrics.registerFont(TTFont('ArialBlack', font_path))
             summary_df = self.generate_dataframe_from_excel(excel_path)
             grouped_df = self.group_dataframe(summary_df)
@@ -3441,22 +3486,21 @@ class SQLServerConnectionUI(QWidget):
                 base_path = pathlib.Path(__file__).resolve().parent
 
             src_dir = base_path / "src"
-            SECURITY_SCRIPT999_BASE64 = (src_dir / "dp_54.txt").read_text(encoding="utf-8")
-            #SECURITY_SCRIPT_BASE64   = (src_dir / "dp_script.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT54_BASE64 = (src_dir / "vlf_count.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT2_BASE64  = (src_dir / "dp_script2.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT5_BASE64  = (src_dir / "backup_status_check.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT6_BASE64  = (src_dir / "policy_login_check.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT7_BASE64  = (src_dir / "credential_reuse_check.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT8_BASE64  = (src_dir / "schema_cleanup.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT10_BASE64 = (src_dir / "dp_script3.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT11_BASE64 = (src_dir / "sql_execute_extended.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT14_BASE64 = (src_dir / "job_history_report.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT15_BASE64 = (src_dir / "service_account_permissions.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT16_BASE64 = (src_dir / "builtin_accounts_audit.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT17_BASE64 = (src_dir / "server_auth.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT18_BASE64 = (src_dir / "expensive_queries_report.txt").read_text(encoding="utf-8")
-            SECURITY_SCRIPT19_BASE64 = (src_dir / "wait_type_summary.txt").read_text(encoding="utf-8")
+            dp_10 = read_b64_auto(src_dir / "dp_10.enc")
+            dp_02 = read_b64_auto(src_dir / "dp_02.enc")
+            dp_03 = read_b64_auto(src_dir / "dp_03.enc")
+            dp_05 = read_b64_auto(src_dir / "dp_05.enc")
+            dp_06 = read_b64_auto(src_dir / "dp_06.enc")
+            dp_07 = read_b64_auto(src_dir / "dp_07.enc")
+            dp_15 = read_b64_auto(src_dir / "dp_15.enc")
+            dp_08 = read_b64_auto(src_dir / "dp_08.enc")
+            dp_09 = read_b64_auto(src_dir / "dp_09.enc")
+            dp_14 = read_b64_auto(src_dir / "dp_14.enc")
+            dp_13 = read_b64_auto(src_dir / "dp_13.enc")
+            dp_04 = read_b64_auto(src_dir / "dp_04.enc")
+            dp_12 = read_b64_auto(src_dir / "dp_12.enc")
+            dp_01 = read_b64_auto(src_dir / "dp_01.enc")
+            dp_11 = read_b64_auto(src_dir / "dp_11.enc")
 
             
             self.main_ui.server_info_frame.setVisible(False)
@@ -3490,15 +3534,15 @@ class SQLServerConnectionUI(QWidget):
             self.main_ui.checklist_page.set_output_path(output_path)
             self.main_ui.stack.setCurrentWidget(self.main_ui.checklist_page)
 
-            encoded_scripts = [SECURITY_SCRIPT18_BASE64,
-                               SECURITY_SCRIPT54_BASE64,
-                                SECURITY_SCRIPT2_BASE64,
-                               SECURITY_SCRIPT16_BASE64,
-                               SECURITY_SCRIPT5_BASE64,
-                               SECURITY_SCRIPT6_BASE64, SECURITY_SCRIPT7_BASE64, SECURITY_SCRIPT10_BASE64,
-                               SECURITY_SCRIPT11_BASE64,SECURITY_SCRIPT999_BASE64,
-                               SECURITY_SCRIPT19_BASE64, SECURITY_SCRIPT17_BASE64, SECURITY_SCRIPT15_BASE64,
-                               SECURITY_SCRIPT14_BASE64, SECURITY_SCRIPT8_BASE64
+            encoded_scripts = [dp_01,
+                               dp_02,
+                                dp_03,
+                               dp_04,
+                               dp_05,
+                               dp_06, dp_07, dp_08,
+                               dp_09,dp_10,
+                               dp_11,dp_12,dp_13,
+                               dp_14,dp_15
                                ]
 
             with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
@@ -3596,7 +3640,7 @@ if __name__ == '__main__':
 
     # Splash ekran yükle
     base_path = os.path.dirname(os.path.abspath(__file__))
-    splash_path = os.path.join(base_path, "dp-splash.png")
+    splash_path = os.path.join(base_path, "public/dp-splash.png")
 
     if os.path.exists(splash_path):
         pixmap = QPixmap(splash_path)
