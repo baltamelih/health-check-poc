@@ -1,19 +1,5 @@
-from dp_script import SECURITY_SCRIPT_BASE64  # İlk script
-from vlf_count import SECURITY_SCRIPT54_BASE64
-from dp_script2 import SECURITY_SCRIPT2_BASE64 #Hcv999
-from backup_status_check import SECURITY_SCRIPT5_BASE64
-from policy_login_check import SECURITY_SCRIPT6_BASE64
-from credential_reuse_check import  SECURITY_SCRIPT7_BASE64
-from schema_cleanup import SECURITY_SCRIPT8_BASE64
-from dp_script3 import SECURITY_SCRIPT10_BASE64
-from sql_execute_extended import SECURITY_SCRIPT11_BASE64
-from job_history_report import SECURITY_SCRIPT14_BASE64
-from service_account_permissions import SECURITY_SCRIPT15_BASE64
-from builtin_accounts_audit import SECURITY_SCRIPT16_BASE64
-from server_auth import SECURITY_SCRIPT17_BASE64
-from expensive_queries_report import SECURITY_SCRIPT18_BASE64
-from wait_type_summary import SECURITY_SCRIPT19_BASE64
 import threading
+import pathlib
 import subprocess
 import signal
 import traceback
@@ -3449,6 +3435,30 @@ class SQLServerConnectionUI(QWidget):
     def run_scripts_and_export(self):
 
         try:
+            if getattr(sys, 'frozen', False):
+                base_path = pathlib.Path(sys._MEIPASS)  # paket içindeki temp klasör
+            else:
+                base_path = pathlib.Path(__file__).resolve().parent
+
+            src_dir = base_path / "src"
+            SECURITY_SCRIPT999_BASE64 = (src_dir / "dp_54.txt").read_text(encoding="utf-8")
+            #SECURITY_SCRIPT_BASE64   = (src_dir / "dp_script.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT54_BASE64 = (src_dir / "vlf_count.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT2_BASE64  = (src_dir / "dp_script2.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT5_BASE64  = (src_dir / "backup_status_check.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT6_BASE64  = (src_dir / "policy_login_check.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT7_BASE64  = (src_dir / "credential_reuse_check.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT8_BASE64  = (src_dir / "schema_cleanup.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT10_BASE64 = (src_dir / "dp_script3.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT11_BASE64 = (src_dir / "sql_execute_extended.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT14_BASE64 = (src_dir / "job_history_report.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT15_BASE64 = (src_dir / "service_account_permissions.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT16_BASE64 = (src_dir / "builtin_accounts_audit.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT17_BASE64 = (src_dir / "server_auth.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT18_BASE64 = (src_dir / "expensive_queries_report.txt").read_text(encoding="utf-8")
+            SECURITY_SCRIPT19_BASE64 = (src_dir / "wait_type_summary.txt").read_text(encoding="utf-8")
+
+            
             self.main_ui.server_info_frame.setVisible(False)
             username = self.server_name.text()
             valid_username = username.replace("/", "_").replace("\\", "_").replace(":", "_").replace("*", "_").replace(
@@ -3482,11 +3492,11 @@ class SQLServerConnectionUI(QWidget):
 
             encoded_scripts = [SECURITY_SCRIPT18_BASE64,
                                SECURITY_SCRIPT54_BASE64,
-                               SECURITY_SCRIPT_BASE64, SECURITY_SCRIPT2_BASE64,
+                                SECURITY_SCRIPT2_BASE64,
                                SECURITY_SCRIPT16_BASE64,
                                SECURITY_SCRIPT5_BASE64,
                                SECURITY_SCRIPT6_BASE64, SECURITY_SCRIPT7_BASE64, SECURITY_SCRIPT10_BASE64,
-                               SECURITY_SCRIPT11_BASE64,
+                               SECURITY_SCRIPT11_BASE64,SECURITY_SCRIPT999_BASE64,
                                SECURITY_SCRIPT19_BASE64, SECURITY_SCRIPT17_BASE64, SECURITY_SCRIPT15_BASE64,
                                SECURITY_SCRIPT14_BASE64, SECURITY_SCRIPT8_BASE64
                                ]
@@ -3500,6 +3510,7 @@ class SQLServerConnectionUI(QWidget):
                     encoding = detected.get('encoding', 'utf-8')
                     decoded_script = decoded_bytes.decode(encoding, errors='ignore')
                     statements = decoded_script.split("GO")
+                    print(statements)
                     select_statements = re.findall(r"(SELECT\s+\*.*?FROM\s+#\w+;)", decoded_script, re.IGNORECASE)
                     table_names = self.extract_table_names(decoded_script)
 
@@ -3543,7 +3554,7 @@ class SQLServerConnectionUI(QWidget):
                                 self.log_error(e, "cursor_error")
 
                         except Exception as e:
-                            self.checklist_window.update_list(selected, False)
+                            self.main_ui.checklist_page.update_list(selected, False) 
                             self.log_error(e, "windows_group_error")
                             continue
                         time.sleep(0.3)

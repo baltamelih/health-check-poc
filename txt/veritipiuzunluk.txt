@@ -1,0 +1,279 @@
+-------------------------Veri Tipi Uzunluğu--------------------------
+
+--NVARCHAR VE VARCHAR KARAKTERLERİN UZUNLUK DEĞERLERİNİ DEĞERLENDİRİLMESİ İÇİN KULLANILIR , HEALTCHECK İÇİN
+--KONTROLLÜ ÇALIŞTIRILMASI ÖNERİLİR.
+
+ IF OBJECT_ID('tempdb.dbo.#VeriTespiti', 'U') IS NOT NULL DROP TABLE #VeriTespiti;
+CREATE TABLE #VeriTespiti
+(
+TableName nvarchar(256)
+
+,ColumnName1 nvarchar(256) default(space(0))
+,MaxSize1 int              default(0)
+,UsedMaxSize1 int		 default(0)
+
+,ColumnName2 nvarchar(256)		 default(space(0))
+,MaxSize2 int					 default(0)
+,UsedMaxSize2 int				 default(0)
+,ColumnName3 nvarchar(256)		default(space(0))
+,MaxSize3 int					default(0)
+,UsedMaxSize3 int				default(0)
+,ColumnName4 nvarchar(256)		default(space(0))
+,MaxSize4 int					default(0)
+,UsedMaxSize4 int				default(0)
+,ColumnName5 nvarchar(256)		default(space(0))
+,MaxSize5 int					default(0)
+,UsedMaxSize5 int				default(0)
+,ColumnName6 nvarchar(256)		 default(space(0))
+,MaxSize6 int					 default(0)
+,UsedMaxSize6 int				 default(0)
+,ColumnName7 nvarchar(256)		  default(space(0))
+,MaxSize7 int					  default(0)
+,UsedMaxSize7 int				  default(0)
+,ColumnName8 nvarchar(256)		  default(space(0))
+,MaxSize8 int					  default(0)
+,UsedMaxSize8 int				  default(0)
+,ColumnName9 nvarchar(256)		  default(space(0))
+,MaxSize9 int					  default(0)
+,UsedMaxSize9 int				  default(0)
+,ColumnName10 nvarchar(256)		  default(space(0))
+,MaxSize10 int					  default(0)
+,UsedMaxSize10 int				  default(0)
+)
+
+--bir tabloda birden fazla varchar,nvarchar karakterleri varsa o tabloyu tek seferde o kolonlarını okuması için
+IF OBJECT_ID('tempdb.dbo.#VeriTespiti2', 'U') IS NOT NULL DROP TABLE #VeriTespiti2;
+CREATE TABLE #VeriTespiti2
+(
+SortOrder int
+,TableName nvarchar(256)
+,ColumnName nvarchar(256)
+,MaxSize nvarchar(10)
+)
+
+
+DECLARE @TABLE_NAME     nvarchar(256)
+DECLARE @TABLE_SCHEMA     nvarchar(15)
+
+DECLARE VerileriHazirla CURSOR FAST_FORWARD FOR
+
+select  TABLE_NAME,TABLE_SCHEMA from (
+select DISTINCT TABLE_NAME,TABLE_SCHEMA
+--,COLUMN_NAME
+--,CHARACTER_MAXIMUM_LENGTH = case when CHARACTER_MAXIMUM_LENGTH=-1 then 9999999 else CHARACTER_MAXIMUM_LENGTH end
+from INFORMATION_SCHEMA.COLUMNS col
+INNER JOIN sys.objects as obj ON obj.name = col.TABLE_NAME
+WHERE DATA_TYPE in ('nvarchar','varchar')  and type_desc='USER_TABLE'  and name not like '%Log%'
+and (CHARACTER_MAXIMUM_LENGTH=-1 or CHARACTER_MAXIMUM_LENGTH>100)
+)as data where TABLE_NAME not like 'au%'
+--AND TABLE_NAME='trInvoiceHeader'
+order by 1
+
+
+OPEN VerileriHazirla
+FETCH NEXT FROM VerileriHazirla INTO @TABLE_NAME,@TABLE_SCHEMA
+WHILE @@FETCH_STATUS = 0
+BEGIN
+
+--select  top 1 * from 103_YeniUyeMezuniyetCohortu
+
+DELETE FROM  #VeriTespiti2
+insert into #VeriTespiti2
+select
+SortOrder = DENSE_RANK() OVER(ORDER BY COLUMN_NAME)
+,TABLE_NAME
+,COLUMN_NAME
+,CHARACTER_MAXIMUM_LENGTH = CAST( case when CHARACTER_MAXIMUM_LENGTH=-1 then 9999999 else CHARACTER_MAXIMUM_LENGTH end  AS nvarchar(10))
+from INFORMATION_SCHEMA.COLUMNS col
+INNER JOIN sys.objects as obj ON obj.name = col.TABLE_NAME
+WHERE DATA_TYPE in ('nvarchar','varchar')
+AND TABLE_NAME=@TABLE_NAME
+and (CHARACTER_MAXIMUM_LENGTH=-1 or CHARACTER_MAXIMUM_LENGTH>100)
+
+
+	IF (SELECT COUNT(*) FROM #VeriTespiti2 )>0
+	BEGIN
+
+	DECLARE @SQL NVARCHAR(MAX)= N'select
+	tablo=''TABLE_NAME''
+	,Colomn1=''ColumnName1'',Maxboyut1=''MaxSize1'',UsedMaxSize1=max(LEN([ColumnName1]))
+	,Colomn2=''ColumnName2'',Maxboyut2=''MaxSize2'',UsedMaxSize2=max(LEN([ColumnName2_1]))
+	,Colomn3=''ColumnName3'',Maxboyut3=''MaxSize3'',UsedMaxSize3=max(LEN([ColumnName3_1]))
+	,Colomn4=''ColumnName4'',Maxboyut4=''MaxSize4'',UsedMaxSize4=max(LEN([ColumnName4_1]))
+	,Colomn5=''ColumnName5'',Maxboyut5=''MaxSize5'',UsedMaxSize5=max(LEN([ColumnName5_1]))
+	,Colomn6=''ColumnName6'',Maxboyut6=''MaxSize6'',UsedMaxSize6=max(LEN([ColumnName6_1]))
+	,Colomn7=''ColumnName7'',Maxboyut7=''MaxSize7'',UsedMaxSize7=max(LEN([ColumnName7_1]))
+	,Colomn8=''ColumnName8'',Maxboyut8=''MaxSize8'',UsedMaxSize8=max(LEN([ColumnName8_1]))
+	,Colomn9=''ColumnName9'',Maxboyut9=''MaxSize9'',UsedMaxSize9=max(LEN([ColumnName9_1]))
+	,Colomn_10=''ColumnName_10'',Maxboyut_10=''MaxSize_10'',UsedMaxSize_10=max(LEN([ColumnName_10]))
+
+	from [SCHEMA].[TABLE_NAME] with(nolock)     '
+	SET @SQL = REPLACE(@SQL,N'TABLE_NAME',@TABLE_NAME)
+
+	SET @SQL = REPLACE(@SQL,N'ColumnName1',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=1 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'MaxSize1',ISNULL((select MaxSize from #VeriTespiti2 where SortOrder=1 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'SCHEMA',@TABLE_SCHEMA)
+
+	if exists((select ColumnName from #VeriTespiti2 where SortOrder=2 AND TableName=@TABLE_NAME))
+	begin
+
+	SET @SQL = REPLACE(@SQL,N'ColumnName2_1',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=2 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'ColumnName2',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=2 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'MaxSize2',ISNULL((select MaxSize from #VeriTespiti2 where SortOrder=2 AND TableName=@TABLE_NAME),SPACE(0)))
+	end
+	else
+	begin
+	SET @SQL = REPLACE(@SQL,N'[ColumnName2_1]',0)
+	SET @SQL = REPLACE(@SQL,N'ColumnName2',SPACE(0))
+	SET @SQL = REPLACE(@SQL,N'MaxSize2',0)
+
+
+	end
+
+	if (select count(*) from #VeriTespiti2 where SortOrder=3 AND TableName=@TABLE_NAME)>0
+	begin
+
+	SET @SQL = REPLACE(@SQL,N'ColumnName3_1',(select ColumnName from #VeriTespiti2 where SortOrder=3 AND TableName=@TABLE_NAME))
+	SET @SQL = REPLACE(@SQL,N'ColumnName3',(select ColumnName from #VeriTespiti2 where SortOrder=3 AND TableName=@TABLE_NAME))
+	SET @SQL = REPLACE(@SQL,N'MaxSize3',(select MaxSize from #VeriTespiti2 where SortOrder=3 AND TableName=@TABLE_NAME))
+	end
+	else
+	begin
+	SET @SQL = REPLACE(@SQL,N'[ColumnName3_1]',0)
+	SET @SQL = REPLACE(@SQL,N'ColumnName3',SPACE(0))
+	SET @SQL = REPLACE(@SQL,N'MaxSize3',0)
+
+	end
+
+		if exists((select ColumnName from #VeriTespiti2 where SortOrder=4 AND TableName=@TABLE_NAME))
+	begin
+
+	SET @SQL = REPLACE(@SQL,N'ColumnName4_1',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=4 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'ColumnName4',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=4 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'MaxSize4',ISNULL((select MaxSize from #VeriTespiti2 where SortOrder=4 AND TableName=@TABLE_NAME),SPACE(0)))
+	end
+	else
+	begin
+	SET @SQL = REPLACE(@SQL,N'[ColumnName4_1]',0)
+	SET @SQL = REPLACE(@SQL,N'ColumnName4',SPACE(0))
+	SET @SQL = REPLACE(@SQL,N'MaxSize4',0)
+
+	end
+
+		if exists((select ColumnName from #VeriTespiti2 where SortOrder=5 AND TableName=@TABLE_NAME))
+	begin
+
+	SET @SQL = REPLACE(@SQL,N'ColumnName5_1',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=5 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'ColumnName5',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=5 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'MaxSize5',ISNULL((select MaxSize from #VeriTespiti2 where SortOrder=5 AND TableName=@TABLE_NAME),SPACE(0)))
+	end
+	else
+	begin
+	SET @SQL = REPLACE(@SQL,N'[ColumnName5_1]',0)
+	SET @SQL = REPLACE(@SQL,N'ColumnName5',SPACE(0))
+	SET @SQL = REPLACE(@SQL,N'MaxSize5',0)
+
+	end
+
+		if exists((select ColumnName from #VeriTespiti2 where SortOrder=6 AND TableName=@TABLE_NAME))
+	begin
+
+	SET @SQL = REPLACE(@SQL,N'ColumnName6_1',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=6 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'ColumnName6',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=6 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'MaxSize6',ISNULL((select MaxSize from #VeriTespiti2 where SortOrder=6 AND TableName=@TABLE_NAME),SPACE(0)))
+	end
+	else
+	begin
+	SET @SQL = REPLACE(@SQL,N'[ColumnName6_1]',0)
+	SET @SQL = REPLACE(@SQL,N'ColumnName6',SPACE(0))
+	SET @SQL = REPLACE(@SQL,N'MaxSize6',0)
+
+	end
+
+
+		if exists((select ColumnName from #VeriTespiti2 where SortOrder=7 AND TableName=@TABLE_NAME))
+	begin
+
+	SET @SQL = REPLACE(@SQL,N'ColumnName7_1',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=7 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'ColumnName7',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=7 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'MaxSize7',ISNULL((select MaxSize from #VeriTespiti2 where SortOrder=7 AND TableName=@TABLE_NAME),SPACE(0)))
+	end
+	else
+	begin
+	SET @SQL = REPLACE(@SQL,N'[ColumnName7_1]',0)
+	SET @SQL = REPLACE(@SQL,N'ColumnName7',SPACE(0))
+	SET @SQL = REPLACE(@SQL,N'MaxSize7',0)
+
+	end
+
+		if exists((select ColumnName from #VeriTespiti2 where SortOrder=8 AND TableName=@TABLE_NAME))
+	begin
+
+	SET @SQL = REPLACE(@SQL,N'ColumnName8_1',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=8 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'ColumnName8',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=8 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'MaxSize8',ISNULL((select MaxSize from #VeriTespiti2 where SortOrder=8 AND TableName=@TABLE_NAME),SPACE(0)))
+	end
+	else
+	begin
+	SET @SQL = REPLACE(@SQL,N'[ColumnName8_1]',0)
+	SET @SQL = REPLACE(@SQL,N'ColumnName8',SPACE(0))
+	SET @SQL = REPLACE(@SQL,N'MaxSize8',0)
+
+	end
+
+	if exists((select ColumnName from #VeriTespiti2 where SortOrder=9 AND TableName=@TABLE_NAME))
+	begin
+	SET @SQL = REPLACE(@SQL,N'ColumnName9_1',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=9 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'ColumnName9',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=9 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'MaxSize9',ISNULL((select MaxSize from #VeriTespiti2 where SortOrder=9 AND TableName=@TABLE_NAME),SPACE(0)))
+	end
+	else
+	begin
+	SET @SQL = REPLACE(@SQL,N'[ColumnName9_1]',0)
+	SET @SQL = REPLACE(@SQL,N'ColumnName9',SPACE(0))
+	SET @SQL = REPLACE(@SQL,N'MaxSize9',0)
+
+	end
+
+	if exists((select ColumnName from #VeriTespiti2 where SortOrder=10 AND TableName=@TABLE_NAME))
+	begin
+	SET @SQL = REPLACE(@SQL,N'ColumnName_10',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=10 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'ColumnName_10',ISNULL((select ColumnName from #VeriTespiti2 where SortOrder=10 AND TableName=@TABLE_NAME),SPACE(0)))
+	SET @SQL = REPLACE(@SQL,N'MaxSize_10',ISNULL((select MaxSize from #VeriTespiti2 where SortOrder=10 AND TableName=@TABLE_NAME),SPACE(0)))
+	end
+	else
+	begin
+	SET @SQL = REPLACE(@SQL,N'[ColumnName_10]',0)
+	SET @SQL = REPLACE(@SQL,N'ColumnName_10',SPACE(0))
+	SET @SQL = REPLACE(@SQL,N'MaxSize_10',0)
+
+	end
+
+
+	insert into #VeriTespiti
+	EXEC(@SQL)
+
+	END
+
+	FETCH NEXT FROM VerileriHazirla INTO @TABLE_NAME,@TABLE_SCHEMA
+END
+CLOSE VerileriHazirla
+DEALLOCATE VerileriHazirla
+
+
+UPDATE #VeriTespiti
+SET
+    UsedMaxSize1 = ISNULL(UsedMaxSize1, -1),
+    UsedMaxSize2 = ISNULL(UsedMaxSize2, -1),
+    UsedMaxSize3 = ISNULL(UsedMaxSize3, -1),
+    UsedMaxSize4 = ISNULL(UsedMaxSize4, -1),
+    UsedMaxSize5 = ISNULL(UsedMaxSize5, -1),
+    UsedMaxSize6 = ISNULL(UsedMaxSize6, -1),
+    UsedMaxSize7 = ISNULL(UsedMaxSize7, -1),
+    UsedMaxSize8 = ISNULL(UsedMaxSize8, -1),
+    UsedMaxSize9 = ISNULL(UsedMaxSize9, -1),
+    UsedMaxSize10 = ISNULL(UsedMaxSize10, -1);
+
+
+
+select * from #VeriTespiti
