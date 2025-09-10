@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# BU DOSYA OTOMATİK OLARAK prepare_config.py TARAFINDAN OLUŞTURULMUŞTUR.
+# BU DOSYA OTOMATİK OLARAK prepare_assets.py TARAFINDAN OLUŞTURULMUŞTUR.
 # DOĞRUDAN DÜZENLEMEYİN!
 #
 

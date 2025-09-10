@@ -609,7 +609,7 @@ class CheckListWindow(QWidget):
 
         self.group_mapping = {
             "SQL Server Config": [
-                "MaxServerMemory", "MinServerMemory", "SQLFiles", "TempDB", "LogFiles", "SQLConfiguration",
+                "MaxServerMemory", "MinServerMemory", "SQLFiles", "TempDB", "LogFiles",
                 "BackupCompressionInfo", "Storage", "ServerConfiguration", "SystemFiles",
                 "HighAvailability", "SPCU", "SQLServerVersion", "OSPerformance", "Antivirus",
                 "IOPerformance", "AlwaysOnInfo", "TotalMemory"
@@ -618,9 +618,9 @@ class CheckListWindow(QWidget):
                             "VLFCountResults", "WaitStats"],
             "Security": [
                 "HighPriviligeLogin", "EmptyPasswordLogins", "SamePasswordLogins", "PolicyNotCheckedLogins",
-                "ServerLogins", "DisableLogins", "CPUInfo", "ServiceAccount", "PermissionResults",
+                "ServerLogins", "DisableLogins", "CPUInfo", "ServiceAccount", "ServiceAccountPermission",
                 "SaAccount", "OrphanUser",
-                "XpCmdShell", "Sysadminlogin", "SQLServerAuthentication",
+                "XpCmdShell", "SQLServerAuthentication",
                 "BuiltinAdmin"
             ],
             "Query Performance": [
@@ -1350,18 +1350,18 @@ class SQLServerConnectionUI(QWidget):
                     "PageVerify", "CompatibilityLevel", "AutoShrink", "AutoClose", "RecoveryModel", "Storage",
                     "SystemDatabases", "JobHistory", "CPU", "ServiceAccount", "ServiceAccountPermission", "SaAccount",
                     "OrphanUser", "VLFCount", "EmptyPasswordLogins", "PolicyNotCheckedLogins", "SamePasswordLogins",
-                    "DisableLogins", "Sysadminlogin", "SQLServerBrowserService", "XpCmdShell", "UpdateStats",
+                    "DisableLogins", "HighPriviligeLogin", "SQLServerBrowserService", "XpCmdShell", "UpdateStats",
                     "ReIndex", "LeftoverFakeIndex", "ClusteredIndex", "MissingIndex", "BadIndex",
-                    "BuiltinAdmin", "SQLServerAuthentication", "ExpensiveQueries", "WaitStats",
+                    "BuiltinAdmin", "SQLServerAuthentication", "ExpensiveQueries", "WaitStats", "SystemFiles",
 
                 ],
                 "Warning": [
                     2, 3, 3, 2, 1, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2,
-                    1, 2, 1, 1, 3, 1, 2, 1, 1, 3, 3, 2, 2, 2, 1, 1, 1, 1, 1
+                    1, 2, 1, 1, 3, 1, 2, 1, 1, 3, 3, 2, 2, 2, 1, 1, 1, 1, 1, 1
                 ],
                 "Failed": [
                     2, 3, 3, 3, 1, 3, 3, 2, 1, 2, 2, 1, 1, 3, 2, 2, 2, 3, 2, 2, 2, 2, 3, 2, 1, 3, 2, 2, 1, 2,
-                    2, 3, 1, 1, 3, 3, 3, 1, 1, 4, 4, 3, 3, 3, 2, 1, 1, 1, 1
+                    2, 3, 1, 1, 3, 3, 3, 1, 1, 4, 4, 3, 3, 3, 2, 1, 1, 1, 1, 1
                 ]
             }
 
@@ -1592,6 +1592,7 @@ class SQLServerConnectionUI(QWidget):
                             })
                     except Exception as e:
                         self.log_error(e, "LeftoverFakeIndex")
+
                 elif sheet_name == "Sysadminlogin":
                     # E108
                     try:
@@ -1608,21 +1609,21 @@ class SQLServerConnectionUI(QWidget):
                         # Durumu belirle ve rows listesine ekle
                         if user_count < 10:
                             rows.append({
-                                "control_column_name": "Sysadminlogin",
+                                "control_column_name": "HighPriviligeLogin",
                                 "status": 1
                             })
                         elif 5 <= user_count <= 10:
                             rows.append({
-                                "control_column_name": "Sysadminlogin",
+                                "control_column_name": "HighPriviligeLogin",
                                 "status": 2
                             })
                         else:
                             rows.append({
-                                "control_column_name": "Sysadminlogin",
+                                "control_column_name": "HighPriviligeLogin",
                                 "status": 0
                             })
                     except Exception as e:
-                        self.log_error(e, "Sysadminlogin")
+                        self.log_error(e, "HighPriviligeLogin")
 
 
                 elif sheet_name == "DBCCResults":
@@ -1906,8 +1907,6 @@ class SQLServerConnectionUI(QWidget):
                         self.log_error(e, "MaxMemory")
 
 
-
-
                 elif sheet_name == "BackupCompressionInfo":
                     # E117
                     try:
@@ -1916,8 +1915,9 @@ class SQLServerConnectionUI(QWidget):
                                 status = 1  # Başarılı
                             else:
                                 status = 0  # Başarısız
-                            # Durumu rows listesine ekle
-                            rows.append({"control_column_name": "CompressionBackup", "status": status})
+                        else:
+                            status = 0
+                        rows.append({"control_column_name": "CompressionBackup", "status": status})
                     except Exception as e:
                         self.log_error(e, "CompressionBackup")
 
@@ -1950,8 +1950,7 @@ class SQLServerConnectionUI(QWidget):
                     except Exception as e:
                         self.log_error(e, "SQLFiles")
 
-
-                elif sheet_name == "DatabaseFileInfo":  # TempDB kontrolü
+                    # TempDB kontrolü
                     #E119
                     #11062025 update
                     try:
@@ -1962,8 +1961,7 @@ class SQLServerConnectionUI(QWidget):
                             (sheet_df['type_desc'].str.upper() == 'ROWS')
                             ]
                         # is_percent_growth kontrolü
-                        percent_growth_issue = temp_data_files['is_percent_growth'].str.upper().str.strip().eq(
-                            'DOĞRU').any()
+                        percent_growth_issue = temp_data_files['is_percent_growth'].astype(str).str.upper().str.strip().eq('TRUE').any()
                         # growth değerleri aynı mı?
                         same_growth = temp_data_files['growth'].nunique() == 1
                         # tempdb dosyalarının diski
@@ -2442,14 +2440,14 @@ class SQLServerConnectionUI(QWidget):
 
                         # Eğer tek bir disk varsa, sistem veritabanları aynı disktedir
                         if len(disk_drives) == 1:
-                            rows.append({"control_column_name": "SistemDosyalari", "status": 1})
+                            rows.append({"control_column_name": "SystemFiles", "status": 1})
                         else:
                             rows.append({
-                                "control_column_name": "SistemDosyalari",
+                                "control_column_name": "SystemFiles",
                                 "status": 0
                             })
                     except Exception as e:
-                        self.log_error(e, "SistemDosyalari")
+                        self.log_error(e, "SystemFiles")
 
                 elif sheet_name == "CPUInfo":
                     # E134
@@ -2709,12 +2707,12 @@ class SQLServerConnectionUI(QWidget):
             Group the DataFrame into categories for better organization in the PDF report.
             """
             group_mapping = {
-                "SQL Server Configuration": ["Storage", "PermissionResults",
+                "SQL Server Configuration": ["Storage",
                                                 "MaxMemory", "CPU",
-                                             "MinMemory", "SQLFiles", "TempDB", "LogFiles", "SQLConfiguration",
-                                             "CompressionBackup", "Storage", "ServerConfig", "SistemDosyalari"],
-                "VM Configuration": ["HighAvailability", "SPCU", "SQLServerVersion", "OSPerformance", "Antivirus",
+                                             "MinMemory", "SQLFiles", "TempDB", "LogFiles",
+                                             "CompressionBackup", "ServerConfig", "SystemFiles","HighAvailability", "SPCU", "SQLServerVersion", "OSPerformance", "Antivirus",
                                      "Local Security", "IOPerformance", "AlwaysOn"],
+                "VM Configuration": [],
                 "Performance": ["Deadlock", "JobHistory", "PowerPlan","WaitStats", "VLFCount"],
                 "Security": ["SQLServerAuthentication","HighPriviligeLogin", "EmptyPasswordLogins", "SamePasswordLogins",
                              "PolicyNotCheckedLogins", "ServerLogins", "DisableLogins", "ServiceAccount",
@@ -2757,9 +2755,6 @@ class SQLServerConnectionUI(QWidget):
                         item = re.sub(r'^SecHC_', '', item)
                         item = re.sub(r'^SecHc_', '', item)
 
-                        # "Sysadminlogin" özel durum
-                        #if item == 'Sysadminlogin':
-                        #   item = 'HighPriviligeLogin'
 
                         # Sonuçları listeye ekle
                         grouped_data.append([group, item, status])

@@ -174,7 +174,8 @@ CREATE TABLE #ServerInfo (
     [Sanal Server] NVARCHAR(50),
     OS NVARCHAR(255),
     [Cumulative Update] NVARCHAR(50),
-    [SQL Version] NVARCHAR(50)
+    [SQL Version] NVARCHAR(50),
+    create_date DATETIME
 );
 
 DECLARE @Version INT;
@@ -207,7 +208,8 @@ BEGIN
             WHEN @Version = 15 THEN 'SQL Server 2019'
             WHEN @Version = 14 THEN 'SQL Server 2017'
             ELSE 'Bilinmiyor'
-        END AS [SQL Version]
+        END AS [SQL Version],
+        GETDATE() AS create_date
     FROM sys.dm_os_sys_info;
 
 
@@ -239,7 +241,8 @@ BEGIN
             WHEN @Version = 10 THEN 'SQL Server 2008/R2'
             WHEN @Version = 9 THEN 'SQL Server 2005'
             ELSE 'Bilinmiyor'
-        END AS [SQL Version]
+        END AS [SQL Version],
+        GETDATE() AS create_date
     FROM sys.dm_os_sys_info;
 
 
