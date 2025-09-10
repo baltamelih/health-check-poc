@@ -16,7 +16,6 @@ DROP TABLE #temp;
 DROP TABLE #DatabasePageVerifyInfo;
 DROP TABLE #DatabaseCompatibilityInfo;
 DROP TABLE #DatabaseAutoShrinkInfo;
-DROP TABLE #DatabaseAutoCloseInfo;
 DROP TABLE #DatabaseLogInfo;
 DROP TABLE #JobHistory;
 DROP TABLE #ORPHANUSER;

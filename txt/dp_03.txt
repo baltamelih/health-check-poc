@@ -79,10 +79,7 @@ BEGIN
     DROP TABLE #DatabaseAutoShrinkInfo;
 END
 
-IF OBJECT_ID('tempdb..#DatabaseAutoCloseInfo') IS NOT NULL
-BEGIN
-    DROP TABLE #DatabaseAutoCloseInfo;
-END
+
 
 IF OBJECT_ID('tempdb..#DatabaseLogInfo') IS NOT NULL
 BEGIN
@@ -727,22 +724,6 @@ ORDER BY db.[name] OPTION (RECOMPILE);
 
 
 
--------------------------is_auto_close_on--------------------------
--- Create temporary table for Auto Close info
-CREATE TABLE #DatabaseAutoCloseInfo (
-    [Database Name] NVARCHAR(255),
-    is_auto_close_on BIT
-);
-
--- Insert data into the temporary table
-INSERT INTO #DatabaseAutoCloseInfo
-SELECT
-    db.[name] AS [Database Name],
-    db.is_auto_close_on
-FROM sys.databases AS db WITH (NOLOCK)
-ORDER BY db.[name] OPTION (RECOMPILE);
-
-
 
 ------------------[Recovery Model]--------------------------------
 -- Create a temporary table for Recovery Model
@@ -966,7 +947,6 @@ SELECT * FROM #DeadlockPerformance;
 SELECT * FROM #DatabasePageVerifyInfo;
 SELECT * FROM #DatabaseCompatibilityInfo;
 SELECT * FROM #DatabaseAutoShrinkInfo;
-SELECT * FROM #DatabaseAutoCloseInfo;
 SELECT * FROM #DatabaseLogInfo;
 SELECT * FROM #JobHistory;
 SELECT * FROM #ORPHANUSER;

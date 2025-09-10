@@ -6,16 +6,12 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('public/temp_watermark1.png', '.'),
         ('arialbd.ttf', '.'),
-        ('public/dp-splash.png', '.'),
-        ('public/dplogo.png', '.'),
-        ('public/dpoint1.png', '.'),
-        ('public/blur.png', '.'),
+        ('public', 'public'),
         ('spcu', 'spcu'),
         ('src/serverinfo.txt', '.') ,
         ('src', 'src')
-        
+
     ],
     hiddenimports=[],
     hookspath=[],
@@ -60,5 +56,5 @@ coll = COLLECT(
     strip=True,
     upx=False,
     upx_exclude=[],
-    name='DPHealthCheck'
+    name='DPHealthCheck2'
 )
