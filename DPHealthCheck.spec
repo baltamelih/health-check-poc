@@ -6,14 +6,17 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('temp_watermark1.png', '.'),
-        ('arialbd.ttf', '.'),
-        ('dp-splash.png', '.'),
-        ('dplogo.png', '.'),
-        ('dpoint1.png', '.'),
-        ('blur.png', '.'),
+        ('public/temp_watermark1.png', '.'),
+        ('public/arialbd.ttf', '.'),
+        ('public/dp-splash.png', '.'),
+        ('public/dplogo.png', '.'),
+        ('public/dpoint1.png', '.'),
+        ('public/blur.png', '.'),
         ('spcu', 'spcu'),
-        ('serverinfo.txt', '.') 
+        ('src/serverinfo.txt', '.') ,
+        ('src', 'src'),
+        ('.env', '.')
+        
     ],
     hiddenimports=[],
     hookspath=[],

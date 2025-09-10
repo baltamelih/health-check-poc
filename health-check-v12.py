@@ -82,6 +82,9 @@ from PyQt5.QtWidgets import QSizePolicy
 
 from pathlib import Path
 from cryptography.fernet import Fernet
+
+
+#  CRYPT
 load_dotenv() 
 _ENV_KEY_NAME = "SECRET_KEY"
 
@@ -104,9 +107,6 @@ def read_b64_from_enc(path: Path) -> str:
     return b64_bytes.decode("utf-8")
 
 def read_b64_auto(path: Path) -> str:
-    """
-    Geriye dönük uyumluluk: önce .enc dene; yoksa .txt'yi düz oku (Base64 metin).
-    """
     p = Path(path)
     if p.suffix == ".enc" and p.exists():
         return read_b64_from_enc(p)
@@ -3534,16 +3534,7 @@ class SQLServerConnectionUI(QWidget):
             self.main_ui.checklist_page.set_output_path(output_path)
             self.main_ui.stack.setCurrentWidget(self.main_ui.checklist_page)
 
-            encoded_scripts = [dp_01,
-                               dp_02,
-                                dp_03,
-                               dp_04,
-                               dp_05,
-                               dp_06, dp_07, dp_08,
-                               dp_09,dp_10,
-                               dp_11,dp_12,dp_13,
-                               dp_14,dp_15
-                               ]
+            encoded_scripts = [dp_01,dp_02,dp_03,dp_04,dp_05,dp_06, dp_07, dp_08,dp_09,dp_10,dp_11,dp_12,dp_13,dp_14,dp_15]
 
             with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
                 sheet_added = False
@@ -3554,7 +3545,6 @@ class SQLServerConnectionUI(QWidget):
                     encoding = detected.get('encoding', 'utf-8')
                     decoded_script = decoded_bytes.decode(encoding, errors='ignore')
                     statements = decoded_script.split("GO")
-                    print(statements)
                     select_statements = re.findall(r"(SELECT\s+\*.*?FROM\s+#\w+;)", decoded_script, re.IGNORECASE)
                     table_names = self.extract_table_names(decoded_script)
 

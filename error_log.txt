@@ -1,0 +1,58 @@
+2025-09-10 12:12:29.346534 - Error: 
+Function: run_script
+Stack Trace:
+Traceback (most recent call last):
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\venv\Lib\site-packages\cryptography\fernet.py", line 131, in _verify_signature
+    h.verify(data[-32:])
+    ~~~~~~~~^^^^^^^^^^^^
+cryptography.exceptions.InvalidSignature: Signature did not match digest.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\health-check-v12.py", line 3489, in run_scripts_and_export
+    dp_10 = read_b64_auto(src_dir / "dp_10.enc")
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\health-check-v12.py", line 112, in read_b64_auto
+    return read_b64_from_enc(p)
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\health-check-v12.py", line 106, in read_b64_from_enc
+    b64_bytes = cipher.decrypt(enc_bytes)  # dönen şey Base64 string'in bytes hali
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\venv\Lib\site-packages\cryptography\fernet.py", line 90, in decrypt
+    return self._decrypt_data(data, timestamp, time_info)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\venv\Lib\site-packages\cryptography\fernet.py", line 149, in _decrypt_data
+    self._verify_signature(data)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\venv\Lib\site-packages\cryptography\fernet.py", line 133, in _verify_signature
+    raise InvalidToken
+cryptography.fernet.InvalidToken
+
+
+2025-09-10 12:12:56.228500 - Error: 
+Function: run_script
+Stack Trace:
+Traceback (most recent call last):
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\venv\Lib\site-packages\cryptography\fernet.py", line 131, in _verify_signature
+    h.verify(data[-32:])
+    ~~~~~~~~^^^^^^^^^^^^
+cryptography.exceptions.InvalidSignature: Signature did not match digest.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\health-check-v12.py", line 3489, in run_scripts_and_export
+    dp_10 = read_b64_auto(src_dir / "dp_10.enc")
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\health-check-v12.py", line 112, in read_b64_auto
+    return read_b64_from_enc(p)
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\health-check-v12.py", line 106, in read_b64_from_enc
+    b64_bytes = cipher.decrypt(enc_bytes)  # dönen şey Base64 string'in bytes hali
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\venv\Lib\site-packages\cryptography\fernet.py", line 90, in decrypt
+    return self._decrypt_data(data, timestamp, time_info)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\venv\Lib\site-packages\cryptography\fernet.py", line 149, in _decrypt_data
+    self._verify_signature(data)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\venv\Lib\site-packages\cryptography\fernet.py", line 133, in _verify_signature
+    raise InvalidToken
+cryptography.fernet.InvalidToken
+
+

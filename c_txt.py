@@ -6,8 +6,8 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 
 # İsteğe bağlı: .env kullanmak istersen yorumdan çıkar
-# from dotenv import load_dotenv
-# load_dotenv()
+from dotenv import load_dotenv
+load_dotenv()
 
 ENV_KEY_NAME = "SECRET_KEY"
 INPUT_DIR = Path("txt")
@@ -18,6 +18,7 @@ def get_or_create_key():
     # 1) .env veya environment'tan oku
     key = os.getenv(ENV_KEY_NAME)
     if key:
+        print("Same Key")
         return key.encode("utf-8")
 
     # 2) Yoksa oluştur ve .env'ye yaz (güvenli saklama için önerilir)
