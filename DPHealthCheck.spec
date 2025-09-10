@@ -7,15 +7,14 @@ a = Analysis(
     binaries=[],
     datas=[
         ('public/temp_watermark1.png', '.'),
-        ('public/arialbd.ttf', '.'),
+        ('arialbd.ttf', '.'),
         ('public/dp-splash.png', '.'),
         ('public/dplogo.png', '.'),
         ('public/dpoint1.png', '.'),
         ('public/blur.png', '.'),
         ('spcu', 'spcu'),
         ('src/serverinfo.txt', '.') ,
-        ('src', 'src'),
-        ('.env', '.')
+        ('src', 'src')
         
     ],
     hiddenimports=[],

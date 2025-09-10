@@ -56,3 +56,13 @@ Traceback (most recent call last):
 cryptography.fernet.InvalidToken
 
 
+2025-09-10 13:39:45.937018 - Error: ('42S02', "[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot drop the table '#AlwaysOnInfo', because it does not exist or you do not have permission. (3701) (SQLExecDirectW)")
+Function: SQL Execution Error
+Stack Trace:
+Traceback (most recent call last):
+  File "C:\Users\ravel\OneDrive\Desktop\health-check-poc-2\health-check-poc\health-check-v12.py", line 3552, in run_scripts_and_export
+    cursor.execute(statement)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^
+pyodbc.ProgrammingError: ('42S02', "[42S02] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot drop the table '#AlwaysOnInfo', because it does not exist or you do not have permission. (3701) (SQLExecDirectW)")
+
+

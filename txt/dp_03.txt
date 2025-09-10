@@ -1,4 +1,7 @@
-
+IF OBJECT_ID('tempdb..#AlwaysOnInfo') IS NOT NULL
+BEGIN
+    DROP TABLE #AlwaysOnInfo;
+END
 
 IF OBJECT_ID('tempdb..#ServerInfo') IS NOT NULL
 BEGIN
@@ -126,6 +129,32 @@ BEGIN
 END
 
 
+
+----------------------------AO_information------------------------------
+CREATE TABLE #AlwaysOnInfo (
+    AvailabilityGroupName NVARCHAR(255),
+    ReplicaServerName NVARCHAR(255),
+    AvailabilityMode NVARCHAR(255),
+    FailoverMode NVARCHAR(255)
+);
+
+-- Always On kontrolu
+IF SERVERPROPERTY('IsHadrEnabled') = 1
+BEGIN
+    -- Always On etkinse, Availability Groups ve Replica bilgilerini tabloya ekler
+    INSERT INTO #AlwaysOnInfo
+    SELECT
+        ag.name AS [AvailabilityGroupName],
+        ar.replica_server_name AS [ReplicaServerName],
+        ar.availability_mode_desc AS [AvailabilityMode],
+        ar.failover_mode_desc AS [FailoverMode]
+    FROM
+        sys.availability_groups ag
+    INNER JOIN
+        sys.availability_replicas ar ON ag.group_id = ar.group_id;
+
+
+END
 -------------------------------------------serverinfo---------------------------------------------------
 
 IF OBJECT_ID('tempdb..#ServerInfo') IS NOT NULL
@@ -918,6 +947,7 @@ DEALLOCATE CursorX;
 
 
     -- Sonuçları döndür
+SELECT * FROM #AlwaysOnInfo;
 SELECT * FROM #ServerInfo;
 SELECT * FROM #ServerConfiguration;
 SELECT * FROM #TotalMemory;

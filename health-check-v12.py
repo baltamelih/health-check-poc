@@ -82,20 +82,17 @@ from PyQt5.QtWidgets import QSizePolicy
 
 from pathlib import Path
 from cryptography.fernet import Fernet
+import config 
 
-
-#  CRYPT
-load_dotenv() 
-_ENV_KEY_NAME = "SECRET_KEY"
 
 def _get_cipher() -> Fernet:
-    key = os.getenv(_ENV_KEY_NAME)
+    key = config.SECRET_KEY
     if not key:
         raise RuntimeError(
             f"{_ENV_KEY_NAME} bulunamadı. "
             "Aynı key ile şifrelemiştik; uygulama başlamadan önce environment'a koy."
         )
-    return Fernet(key.encode("utf-8"))
+    return Fernet(key)
 
 def read_b64_from_enc(path: Path) -> str:
     """
@@ -2956,7 +2953,7 @@ class SQLServerConnectionUI(QWidget):
             QApplication.processEvents()
             time.sleep(0.5)
             QApplication.processEvents()  # UI güncellenmesini sağla
-            font_path = self.get_resource_path("public/arialbd.ttf")
+            font_path = self.get_resource_path("arialbd.ttf")
             pdfmetrics.registerFont(TTFont('ArialBlack', font_path))
             summary_df = self.generate_dataframe_from_excel(excel_path)
             grouped_df = self.group_dataframe(summary_df)
