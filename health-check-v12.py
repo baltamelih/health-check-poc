@@ -307,9 +307,9 @@ class MainUI(QWidget):
 
         # Logo
         logo = QLabel()
-        pix_path = self.get_resource_path("public/dplogo1.png")
+        pix_path = self.get_resource_path("public/dplogo.png")
         pix = QPixmap(pix_path)
-        logo.setPixmap(pix.scaled(480, 480, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        logo.setPixmap(pix.scaled(360, 360, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         logo.setAlignment(Qt.AlignCenter)
 
         # Exit butonu
@@ -3031,13 +3031,13 @@ class SQLServerConnectionUI(QWidget):
             ServerInfo = pd.read_excel(excel_data, sheet_name="ServerInfo")
             server_row = ServerInfo.iloc[0]
 
-            summary_string = f"{server_row['Sunucu']} - {server_row['Edition']} - {server_row['SQL Version']} - {server_row['Version']}"
+            summary_string = f"{server_row['Instance']} - {server_row['Edition']} - {server_row['SQL Version']} - {server_row['Version']}"
 
             excel_data = pd.ExcelFile(excel_path)
             ServerInfo = pd.read_excel(excel_data, sheet_name="ServerInfo")
             server_row = ServerInfo.iloc[0]
 
-            summary_string = f"{server_row['Sunucu']} - {server_row['Edition']} - {server_row['SQL Version']} - {server_row['Version']}"
+            summary_string = f"{server_row['Instance']} - {server_row['Edition']} - {server_row['SQL Version']} - {server_row['Version']}"
             
             if server_row['HA'] == '1' :
                 HA_temp ='Yes'
@@ -3337,7 +3337,7 @@ class SQLServerConnectionUI(QWidget):
                 table_y_position = y_position - 50 - table_height
 
                 # Eğer tablo yukarıdan aşağı sığmıyorsa yeni sayfa
-                if table_y_position < 50:
+                if table_y_position < 30:
                     pdf.showPage()
                     y_position = height - 100
                     pdf.setFillColor(HexColor("#9bb5e8"))

@@ -8,6 +8,13 @@ BEGIN
     DROP TABLE #ServerInfo;
 END
 
+
+IF OBJECT_ID('tempdb..#DatabaseAutoCloseInfo') IS NOT NULL
+BEGIN
+    DROP TABLE #DatabaseAutoCloseInfo;
+END
+
+
 IF OBJECT_ID('tempdb..#ServerConfiguration') IS NOT NULL
 BEGIN
     DROP TABLE #ServerConfiguration;
@@ -160,7 +167,7 @@ BEGIN
 END
 
 CREATE TABLE #ServerInfo (
-    Sunucu NVARCHAR(255),
+    Instance NVARCHAR(255),
     Edition NVARCHAR(255),
     [Version] NVARCHAR(255),
     Collation NVARCHAR(255),
@@ -182,7 +189,7 @@ IF @Version >= 14 -- SQL Server 2017 ve sonrasi
 BEGIN
     INSERT INTO #ServerInfo
     SELECT
-        CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')) AS [Sunucu],
+        CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')) AS [Instance],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('Edition')) AS [Edition],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('ProductVersion')) AS [Version],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('Collation')) AS [Collation],
@@ -216,7 +223,7 @@ ELSE -- SQL Server 2016 ve oncesi
 BEGIN
     INSERT INTO #ServerInfo
     SELECT
-        CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')) AS [Sunucu],
+        CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')) AS [Instance],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('Edition')) AS [Edition],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('ProductVersion')) AS [Version],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('Collation')) AS [Collation],
@@ -707,6 +714,22 @@ ORDER BY db.[name] OPTION (RECOMPILE);
 
 
 
+-------------------------is_auto_close_on--------------------------
+-- Create temporary table for Auto Close info
+CREATE TABLE #DatabaseAutoCloseInfo (
+    [Database Name] NVARCHAR(255),
+    is_auto_close_on BIT
+);
+
+-- Insert data into the temporary table
+INSERT INTO #DatabaseAutoCloseInfo
+SELECT
+    db.[name] AS [Database Name],
+    db.is_auto_close_on
+FROM sys.databases AS db WITH (NOLOCK)
+ORDER BY db.[name] OPTION (RECOMPILE);
+
+
 ---------------------------------is_auto_shrink_on-----------------
 -- Create temporary table for Auto Shrink info
 CREATE TABLE #DatabaseAutoShrinkInfo (
@@ -947,12 +970,12 @@ SELECT * FROM #DeadlockPerformance;
 SELECT * FROM #DatabasePageVerifyInfo;
 SELECT * FROM #DatabaseCompatibilityInfo;
 SELECT * FROM #DatabaseAutoShrinkInfo;
+SELECT * FROM #DatabaseAutoCloseInfo;
 SELECT * FROM #DatabaseLogInfo;
 SELECT * FROM #JobHistory;
 SELECT * FROM #ORPHANUSER;
 SELECT * FROM #EmptyPasswordLogins;
 SELECT * FROM #ServerLogins;
-
 
 
 

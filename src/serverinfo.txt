@@ -6,7 +6,7 @@ BEGIN
 END
 
 CREATE TABLE #ServerInfo (
-    Sunucu NVARCHAR(255),
+    Instance NVARCHAR(255),
     Edition NVARCHAR(255),
     [Version] NVARCHAR(255),
     Collation NVARCHAR(255),
@@ -28,7 +28,7 @@ IF @Version >= 14 -- SQL Server 2017 ve sonrasi
 BEGIN
     INSERT INTO #ServerInfo
     SELECT
-        CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')) AS [Sunucu],
+        CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')) AS [Instance],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('Edition')) AS [Edition],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('ProductVersion')) AS [Version],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('Collation')) AS [Collation],
@@ -62,7 +62,7 @@ ELSE -- SQL Server 2016 ve oncesi
 BEGIN
     INSERT INTO #ServerInfo
     SELECT
-        CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')) AS [Sunucu],
+        CONVERT(NVARCHAR(255), SERVERPROPERTY('MachineName')) AS [Instance],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('Edition')) AS [Edition],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('ProductVersion')) AS [Version],
         CONVERT(NVARCHAR(255), SERVERPROPERTY('Collation')) AS [Collation],

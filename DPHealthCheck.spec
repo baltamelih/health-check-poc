@@ -5,14 +5,15 @@ a = Analysis(
     ['health-check-v12.py'],
     pathex=[],
     binaries=[],
+    
     datas=[
         ('arialbd.ttf', '.'),
         ('public', 'public'),
         ('spcu', 'spcu'),
         ('src/serverinfo.txt', '.') ,
         ('src', 'src')
-
     ],
+
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -56,5 +57,5 @@ coll = COLLECT(
     strip=True,
     upx=False,
     upx_exclude=[],
-    name='DPHealthCheck2'
+    name='DPHealthCheck'
 )
