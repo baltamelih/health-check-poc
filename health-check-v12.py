@@ -201,7 +201,7 @@ class MainUI(QWidget):
             info_layout.setHorizontalSpacing(25)
             info_layout.setVerticalSpacing(15)
 
-            display_keys = ['Sunucu', 'Edition', 'Version', 'CPU', 'RAM (MB)', 'SQL Version']
+            display_keys = ['Instance', 'Edition', 'Version', 'CPU', 'RAM (MB)', 'SQL Version']
             font = QFont("Segoe UI", 10)
 
             for idx, key in enumerate(display_keys):
