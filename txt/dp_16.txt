@@ -1,0 +1,257 @@
+
+SET NOCOUNT ON;
+
+IF OBJECT_ID('tempdb..#db_cpu') IS NOT NULL DROP TABLE #db_cpu;
+IF OBJECT_ID('tempdb..#target_db') IS NOT NULL DROP TABLE #target_db;
+IF OBJECT_ID('tempdb..#db_result') IS NOT NULL DROP TABLE #db_result;
+IF OBJECT_ID('tempdb..#all_frag') IS NOT NULL DROP TABLE #all_frag;
+
+
+IF OBJECT_ID('tempdb..#CPUResults') IS NOT NULL DROP TABLE #CPUResults;
+IF OBJECT_ID('tempdb..#ReindexResults') IS NOT NULL DROP TABLE #ReindexResults;
+IF OBJECT_ID('tempdb..#WorstIndexes') IS NOT NULL DROP TABLE #WorstIndexes;
+
+
+CREATE TABLE #db_cpu
+(
+    database_name sysname,
+    dbid int,
+    cpu_ms float,
+    cpu_pct float
+);
+
+CREATE TABLE #target_db
+(
+    dbid int PRIMARY KEY,
+    database_name sysname
+);
+
+CREATE TABLE #db_result
+(
+    database_name    sysname,
+    severe_cnt       int,
+    moderate_cnt     int,
+    severe_pages     bigint,
+    moderate_pages   bigint,
+    worst_frag_pct   float,
+    measured_indexes int,
+    reindex_score    tinyint
+);
+
+CREATE TABLE #all_frag
+(
+    database_name sysname NOT NULL,
+    schema_name   sysname NOT NULL,
+    table_name    sysname NOT NULL,
+    index_name    sysname NOT NULL,
+    page_count    int     NOT NULL,
+    frag          float   NOT NULL
+);
+
+
+CREATE TABLE #CPUResults
+(
+    database_name sysname,
+    cpu_ms float,
+    cpu_pct decimal(5,2)
+);
+
+CREATE TABLE #ReindexResults
+(
+    database_name sysname,
+    reindex_score tinyint,
+    severe_cnt int,
+    moderate_cnt int,
+    severe_pages bigint,
+    moderate_pages bigint,
+    worst_frag_pct float,
+    measured_indexes int
+);
+
+CREATE TABLE #WorstIndexes
+(
+    database_name sysname,
+    schema_name   sysname,
+    table_name    sysname,
+    index_name    sysname,
+    page_count    int,
+    frag          float
+);
+
+DECLARE @TopDbMax               int             = 3;
+DECLARE @TopDbOnlyIfShareGE    decimal(5,2)    = 0.80;
+DECLARE @CumShareTarget        decimal(5,2)    = 0.90;
+
+DECLARE @TopIdxCandidates      int             = 100;
+DECLARE @TopIdxMeasure         int             = 60;
+DECLARE @MinApproxPages        int             = 2000;
+DECLARE @FragMode              sysname         = N'LIMITED';
+
+DECLARE @HighFragPct           float           = 30.0;
+DECLARE @ModerateFragPct       float           = 10.0;
+DECLARE @HighPageCount         int             = 5000;
+DECLARE @ModeratePageCount     int             = 2000;
+DECLARE @EarlyBadThreshold     int             = 30;
+
+DECLARE @OrderPreference       nvarchar(10)    = N'AUTO';
+
+;WITH qs AS (
+  SELECT plan_handle, total_worker_time
+  FROM sys.dm_exec_query_stats
+),
+pa AS (
+  SELECT 
+      qs.plan_handle,
+      CONVERT(int, MAX(CASE WHEN pa.attribute = 'dbid' THEN pa.value END)) AS dbid
+  FROM qs
+  CROSS APPLY sys.dm_exec_plan_attributes(qs.plan_handle) AS pa
+  GROUP BY qs.plan_handle
+)
+INSERT INTO #db_cpu(database_name, dbid, cpu_ms, cpu_pct)
+SELECT TOP (1000)
+  d.name,
+  pa.dbid,
+  SUM(qs.total_worker_time) / 1000.0,
+  CONVERT(float, 0.0)
+FROM qs
+JOIN pa ON qs.plan_handle = pa.plan_handle
+JOIN sys.databases AS d ON d.database_id = pa.dbid
+WHERE pa.dbid IS NOT NULL
+  AND d.name NOT IN (N'master',N'model',N'msdb',N'tempdb')
+  AND d.state_desc = 'ONLINE'
+GROUP BY d.name, pa.dbid
+ORDER BY SUM(qs.total_worker_time) DESC;
+
+DECLARE @cpu_total_ms float = (SELECT SUM(cpu_ms) FROM #db_cpu);
+IF @cpu_total_ms IS NULL OR @cpu_total_ms = 0 SET @cpu_total_ms = 1;
+UPDATE c SET cpu_pct = cpu_ms / @cpu_total_ms FROM #db_cpu AS c;
+
+DECLARE @top1_share decimal(10,4) = ISNULL((SELECT TOP 1 cpu_pct FROM #db_cpu ORDER BY cpu_pct DESC),0);
+IF @top1_share >= @TopDbOnlyIfShareGE
+BEGIN
+  INSERT INTO #target_db(dbid, database_name)
+  SELECT TOP (1) dbid, database_name FROM #db_cpu ORDER BY cpu_pct DESC;
+END
+ELSE
+BEGIN
+  INSERT INTO #target_db(dbid, database_name)
+  SELECT TOP (@TopDbMax) dbid, database_name
+  FROM #db_cpu
+  ORDER BY cpu_pct DESC;
+END
+
+DECLARE @dbid int, @dbname sysname;
+DECLARE cur CURSOR LOCAL FAST_FORWARD FOR SELECT dbid, database_name FROM #target_db;
+OPEN cur; FETCH NEXT FROM cur INTO @dbid, @dbname;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  DECLARE @sql nvarchar(max) = N'
+  IF OBJECT_ID(''tempdb..#cand'') IS NOT NULL DROP TABLE #cand;
+  SELECT TOP (@TopIdxCandidates)
+      i.object_id, i.index_id,
+      page_count_approx = SUM(p.reserved_page_count)
+  INTO #cand
+  FROM ' + QUOTENAME(@dbname) + N'.sys.dm_db_partition_stats AS p
+  JOIN ' + QUOTENAME(@dbname) + N'.sys.indexes i
+       ON i.object_id=p.object_id AND i.index_id=p.index_id
+  JOIN ' + QUOTENAME(@dbname) + N'.sys.objects o
+       ON o.object_id=i.object_id AND o.type=''U''
+  WHERE p.reserved_page_count >= @MinApproxPages
+    AND i.index_id > 0
+  GROUP BY i.object_id, i.index_id
+  ORDER BY SUM(p.reserved_page_count) DESC;
+
+  IF OBJECT_ID(''tempdb..#cand2'') IS NOT NULL DROP TABLE #cand2;
+  SELECT TOP (@TopIdxMeasure) * INTO #cand2 FROM #cand ORDER BY page_count_approx DESC;
+
+  IF OBJECT_ID(''tempdb..#frag'') IS NOT NULL DROP TABLE #frag;
+  SELECT
+      c.object_id,
+      c.index_id,
+      ips.page_count,
+      ips.avg_fragmentation_in_percent AS frag
+  INTO #frag
+  FROM #cand2 c
+  CROSS APPLY ' + QUOTENAME(@dbname) + N'.sys.dm_db_index_physical_stats(DB_ID(N''' + REPLACE(@dbname,'''','''''') + N'''), c.object_id, c.index_id, NULL, @FragMode) AS ips;
+
+  IF OBJECT_ID(''tempdb..#cls'') IS NOT NULL DROP TABLE #cls;
+  SELECT
+      severe         = CASE WHEN frag >= @HighFragPct     AND page_count >= @HighPageCount     THEN 1 ELSE 0 END,
+      moderate       = CASE WHEN frag >= @ModerateFragPct AND page_count >= @ModeratePageCount THEN 1 ELSE 0 END,
+      severe_pages   = CASE WHEN frag >= @HighFragPct     AND page_count >= @HighPageCount     THEN page_count ELSE 0 END,
+      moderate_pages = CASE WHEN frag >= @ModerateFragPct AND page_count >= @ModeratePageCount THEN page_count ELSE 0 END,
+      frag, page_count, object_id, index_id
+  INTO #cls FROM #frag;
+
+  DECLARE @sev_cnt int      = (SELECT ISNULL(SUM(severe),0) FROM #cls);
+  DECLARE @mod_cnt int      = (SELECT ISNULL(SUM(moderate),0) FROM #cls);
+  DECLARE @sev_pages bigint = (SELECT ISNULL(SUM(severe_pages),0) FROM #cls);
+  DECLARE @mod_pages bigint = (SELECT ISNULL(SUM(moderate_pages),0) FROM #cls);
+  DECLARE @worst float      = (SELECT ISNULL(MAX(frag),0) FROM #cls);
+  DECLARE @measured int     = (SELECT COUNT(*) FROM #frag);
+
+  DECLARE @score tinyint;
+  IF (@sev_cnt >= @EarlyBadThreshold) SET @score = 5;
+  ELSE
+  BEGIN
+      IF (@sev_cnt >= 20 OR @sev_pages >= 200000)                            SET @score = 5;
+      ELSE IF (@sev_cnt BETWEEN 10 AND 19 OR (@sev_cnt >= 5 AND @mod_cnt>=20)) SET @score = 4;
+      ELSE IF (@sev_cnt BETWEEN 5 AND 9  OR  @mod_cnt BETWEEN 10 AND 19)    SET @score = 3;
+      ELSE IF (@sev_cnt BETWEEN 2 AND 4  OR  @mod_cnt BETWEEN 5  AND 9)     SET @score = 2;
+      ELSE                                                                  SET @score = 1;
+  END;
+
+  INSERT INTO #db_result(database_name, severe_cnt, moderate_cnt, severe_pages, moderate_pages, worst_frag_pct, measured_indexes, reindex_score)
+  SELECT N''' + REPLACE(@dbname,'''','''''') + N''', @sev_cnt, @mod_cnt, @sev_pages, @mod_pages, @worst, @measured, @score;
+
+  INSERT INTO #all_frag(database_name, schema_name, table_name, index_name, page_count, frag)
+  SELECT
+      N''' + REPLACE(@dbname,'''','''''') + N''',
+      s.name, o.name, i.name, f.page_count, f.frag
+  FROM #frag f
+  JOIN ' + QUOTENAME(@dbname) + N'.sys.indexes i 
+    ON f.object_id=i.object_id AND f.index_id=i.index_id
+  JOIN ' + QUOTENAME(@dbname) + N'.sys.objects o ON i.object_id=o.object_id
+  JOIN ' + QUOTENAME(@dbname) + N'.sys.schemas s ON o.schema_id=s.schema_id
+  WHERE i.index_id > 0
+    AND i.name IS NOT NULL;
+  ';
+
+  EXEC sp_executesql
+    @sql,
+    N'@TopIdxCandidates int, @TopIdxMeasure int, @MinApproxPages int,
+      @FragMode sysname, @HighFragPct float, @ModerateFragPct float,
+      @HighPageCount int, @ModeratePageCount int, @EarlyBadThreshold int',
+    @TopIdxCandidates=@TopIdxCandidates, @TopIdxMeasure=@TopIdxMeasure, @MinApproxPages=@MinApproxPages,
+    @FragMode=@FragMode, @HighFragPct=@HighFragPct, @ModerateFragPct=@ModerateFragPct,
+    @HighPageCount=@HighPageCount, @ModeratePageCount=@ModeratePageCount, @EarlyBadThreshold=@EarlyBadThreshold;
+
+  FETCH NEXT FROM cur INTO @dbid, @dbname;
+END
+CLOSE cur; DEALLOCATE cur;
+
+INSERT INTO #CPUResults
+SELECT database_name, cpu_ms, CAST(cpu_pct*100.0 AS decimal(5,2))
+FROM #db_cpu;
+
+INSERT INTO #ReindexResults
+SELECT database_name, reindex_score, severe_cnt, moderate_cnt,
+       severe_pages, moderate_pages, worst_frag_pct, measured_indexes
+FROM #db_result;
+
+IF UPPER(@OrderPreference) = N'FRAG'
+  INSERT INTO #WorstIndexes SELECT TOP (20) * FROM #all_frag ORDER BY frag DESC, page_count DESC;
+ELSE IF UPPER(@OrderPreference) = N'PAGES'
+  INSERT INTO #WorstIndexes SELECT TOP (20) * FROM #all_frag ORDER BY page_count DESC, frag DESC;
+ELSE
+BEGIN
+  IF EXISTS (SELECT 1 FROM #all_frag WHERE frag IS NOT NULL)
+    INSERT INTO #WorstIndexes SELECT TOP (20) * FROM #all_frag ORDER BY frag DESC, page_count DESC;
+  ELSE
+    INSERT INTO #WorstIndexes SELECT TOP (20) * FROM #all_frag ORDER BY page_count DESC;
+END
+
+SELECT * FROM #CPUResults;
+SELECT * FROM #ReindexResults;
+SELECT * FROM #WorstIndexes;

@@ -1365,17 +1365,26 @@ class SQLServerConnectionUI(QWidget):
                 ]
             }
 
-            # Create the DataFrame
             scoring_df = pd.DataFrame(data)
-            merged_df = summary_df.merge(scoring_df, left_on='control_column_name', right_on='Parameter', how='left')
+
+            merged_df = summary_df.merge(scoring_df, left_on='control_column_name',
+                                         right_on='Parameter', how='left')
             merged_df.drop('Parameter', axis=1, inplace=True)
 
-            merged_df['Score'] = merged_df.apply(
-                lambda row: row['Failed'] if row['status'] == 0 else (row['Warning'] if row['status'] == 2 else 0), axis=1)
+            def compute_score(row):
+                if row['status'] == 0:  # FAILED
+                    # Eğer özel "score" alanı varsa onu kullan, yoksa Failed kolonunu kullan
+                    return row['score'] if 'score' in row and pd.notna(row['score']) else row['Failed']
+                elif row['status'] == 2:  # WARNING
+                    return row['Warning']
+                else:  # SUCCESSFUL
+                    return 0
+
+            merged_df['Score'] = merged_df.apply(compute_score, axis=1)
             total_score = merged_df['Score'].sum()
 
-
             return total_score
+
         except Exception as e:
             self.log_error(e, "score_table")
             return
@@ -1538,36 +1547,40 @@ class SQLServerConnectionUI(QWidget):
 
 
 
-                elif sheet_name == "ReIndex":
-
-                    # E106
-                    # 11062025 update
+                elif sheet_name == "ReindexResults":
+                    #E106
                     try:
+                        
                         if not sheet_df.empty:
-                            # Gerekirse sayısal alanları güvenliğe al
-                            sheet_df["PageCount"] = pd.to_numeric(sheet_df["PageCount"], errors="coerce").fillna(0)
-                            sheet_df["AvgFragmentationPercent"] = pd.to_numeric(sheet_df["AvgFragmentationPercent"],
-                                                                                errors="coerce").fillna(0)
-                            # Algoritmaya göre: PageCount > 1000 ve Fragmentation % > 50 olan index sayısı
-                            fragmented_indexes = sheet_df[
-                                (sheet_df["PageCount"] > 1000) &
-                                (sheet_df["AvgFragmentationPercent"] > 50)
-                                ]
-                            frag_count = len(fragmented_indexes)
-                            if frag_count > 10:
-                                status = 0  # FAILED
-                            elif 5 <= frag_count <= 10:
-                                status = 2  # WARNING
-                            else:
+                            # reindex_score değerini güvenli sayıya çevir
+                            sheet_df["reindex_score"] = pd.to_numeric(sheet_df["reindex_score"], errors="coerce").fillna(0)
+                            reindex_score = sheet_df["reindex_score"].max() # en büyük reindex_score'u al.
+
+
+                            # Varsayılan status FAILED
+                            status = 0
+
+                            # Eğer tabloda 1 varsa SUCCESSFUL
+                            if (sheet_df["reindex_score"] == 1).any():
                                 status = 1  # SUCCESSFUL
+                            else:
+                                status = 0  # FAILED
+                            
                             rows.append({
                                 "control_column_name": "ReIndex",
-                                "status": status
+                                "status": status,
+                                "score": reindex_score
                             })
                         else:
-                            rows.append({"control_column_name": "ReIndex", "status" : 1 }) # 0/1/2
+                            rows.append({
+                                "control_column_name": "ReIndex",
+                                "status": 0,
+                                "score": 2
+                            })                          
+
+
                     except Exception as e:
-                        self.log_error(e, "ReIndex")
+                        self.log_error(e,"ReIndex")
 
                 elif sheet_name == "LeftoverFakeIndex":
                     # E107
@@ -2159,7 +2172,6 @@ class SQLServerConnectionUI(QWidget):
                     # E124
                     try:
                         long_running_df = pd.read_excel(excel_data, sheet_name="LongRunningJobs")
-                        print(long_running_df["JobName"])
 
                         if not long_running_df.empty:
                             # JobName kolonundaki tüm değerleri kontrol et (case-insensitive)
@@ -2227,7 +2239,6 @@ class SQLServerConnectionUI(QWidget):
                     try:
                         
                         long_running_df = pd.read_excel(excel_data, sheet_name="LongRunningJobs")
-                        print(long_running_df) 
                         if not long_running_df.empty:
                             # JobName kolonundaki tüm değerleri kontrol et (case-insensitive)
                             all_dba = long_running_df['JobName'].astype(str).str.lower().str.startswith("dba").all()
@@ -2675,7 +2686,7 @@ class SQLServerConnectionUI(QWidget):
                 self.log_error(e,"storage")
 
             # Create DataFrame from rows
-            summary_df = pd.DataFrame(rows, columns=["control_column_name", "status"])
+            summary_df = pd.DataFrame(rows, columns=["control_column_name", "status", "score"])
 
             return summary_df
         except Exception as e:
@@ -2762,7 +2773,6 @@ class SQLServerConnectionUI(QWidget):
             # Convert to DataFrame for easier handling
             grouped_df = pd.DataFrame(grouped_data, columns=["Group", "Description", "Status"])
             grouped_df = grouped_df.drop_duplicates()
-            #print(grouped_df)
 
             return pd.DataFrame(grouped_df)
         except Exception as e:
@@ -3493,7 +3503,7 @@ class SQLServerConnectionUI(QWidget):
             dp_12 = read_b64_auto(src_dir / "dp_12.enc")
             dp_01 = read_b64_auto(src_dir / "dp_01.enc")
             dp_11 = read_b64_auto(src_dir / "dp_11.enc")
-
+            dp_16 = read_b64_auto(src_dir / "dp_16.enc")
             
             self.main_ui.server_info_frame.setVisible(False)
             username = self.server_name.text()
@@ -3526,7 +3536,7 @@ class SQLServerConnectionUI(QWidget):
             self.main_ui.checklist_page.set_output_path(output_path)
             self.main_ui.stack.setCurrentWidget(self.main_ui.checklist_page)
 
-            encoded_scripts = [dp_01,dp_02,dp_03,dp_04,dp_05,dp_06, dp_07, dp_08,dp_09,dp_10,dp_11,dp_12,dp_13,dp_14,dp_15]
+            encoded_scripts = [dp_01,dp_02,dp_03,dp_04,dp_05,dp_06, dp_07, dp_08,dp_09,dp_10,dp_11,dp_12,dp_16,dp_13,dp_14,dp_15]
 
             with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
                 sheet_added = False
